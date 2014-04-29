@@ -1,7 +1,12 @@
-import java.util.Random;
+package mas;
+
+import static com.google.common.collect.Maps.newHashMap;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Map;
 
 import javax.measure.Measure;
-import javax.measure.unit.NonSI;
 import javax.measure.unit.SI;
 
 import org.apache.commons.math3.random.MersenneTwister;
@@ -10,12 +15,16 @@ import org.apache.commons.math3.random.RandomGenerator;
 import rinde.sim.core.Simulator;
 import rinde.sim.core.TickListener;
 import rinde.sim.core.TimeLapse;
-import rinde.sim.core.graph.Point;
+import rinde.sim.core.graph.Graph;
+import rinde.sim.core.graph.MultiAttributeData;
+import rinde.sim.core.model.pdp.DefaultPDPModel;
+import rinde.sim.core.model.road.GraphRoadModel;
 import rinde.sim.core.model.road.MovingRoadUser;
-import rinde.sim.core.model.road.PlaneRoadModel;
 import rinde.sim.core.model.road.RoadModel;
+import rinde.sim.serializers.DotGraphSerializer;
+import rinde.sim.serializers.SelfCycleFilter;
 import rinde.sim.ui.View;
-import rinde.sim.ui.renderers.PlaneRoadModelRenderer;
+import rinde.sim.ui.renderers.GraphRoadModelRenderer;
 import rinde.sim.ui.renderers.RoadUserRenderer;
 
 /**
@@ -28,12 +37,14 @@ import rinde.sim.ui.renderers.RoadUserRenderer;
  * 
  * @author Rinde van Lon <rinde.vanlon@cs.kuleuven.be>
  */
-public class SimpleExperiment {
+public class Greedy {
 
     // speed in km/h
-    static final double VEHICLE_SPEED = 50d;
+    static final double VEHICLE_SPEED = 5000 * 1000 / 3600;
+    private static final String MAP_FILE = "/data/maps/leuven-simple.dot";
+    private static final Map<String, Graph<MultiAttributeData>> GRAPH_CACHE = newHashMap();
 
-    private SimpleExperiment() {
+    private Greedy() {
     }
 
     /**
@@ -55,18 +66,20 @@ public class SimpleExperiment {
         final Simulator sim = new Simulator(rnd, Measure.valueOf(1000L,
                 SI.MILLI(SI.SECOND)));
 
-        // register a PlaneRoadModel, a model which facilitates the moving of
-        // RoadUsers on a plane. The plane is bounded by two corner points:
-        // (0,0) and (10,10)
-        sim.register(new PlaneRoadModel(new Point(0, 0), new Point(10, 10),
-                SI.KILOMETER, Measure.valueOf(VEHICLE_SPEED,
-                        NonSI.KILOMETERS_PER_HOUR)));
+        // use map of leuven
+        final RoadModel roadModel = new GraphRoadModel(loadGraph(MAP_FILE),
+                SI.KILOMETER, SI.METERS_PER_SECOND);
+        sim.register(roadModel);
+
+        final DefaultPDPModel pdpModel = new DefaultPDPModel();
+        sim.register(pdpModel);
+
         // configure the simulator, once configured we can no longer change the
         // configuration (i.e. add new models) but we can start adding objects
         sim.configure();
 
         // add a number of drivers on the road
-        final int numDrivers = 200;
+        final int numDrivers = 20;
         for (int i = 0; i < numDrivers; i++) {
             // when an object is registered in the simulator it gets
             // automatically 'hooked up' with models that it's interested in. An
@@ -79,7 +92,7 @@ public class SimpleExperiment {
         // (indicating its boundaries), and the drivers are rendererd as red
         // dots.
         final View.Builder viewBuilder = View.create(sim).with(
-                new PlaneRoadModelRenderer(), new RoadUserRenderer());
+                new GraphRoadModelRenderer(), new RoadUserRenderer());
 
         if (testing) {
             viewBuilder.setSpeedUp(16).enableAutoClose().enableAutoPlay()
@@ -98,7 +111,6 @@ public class SimpleExperiment {
 
         protected RoadModel roadModel;
         protected final RandomGenerator rnd;
-        protected Point destination;
 
         Driver(RandomGenerator r) {
             // we store the reference to the random generator
@@ -111,24 +123,6 @@ public class SimpleExperiment {
             // reference and add ourselves to the model on a random position.
             roadModel = model;
             roadModel.addObjectAt(this, roadModel.getRandomPosition(rnd));
-            Point randomDestination = roadModel.getRandomPosition(rnd);
-            Random rg = new Random();
-            if (rg.nextBoolean()) {
-
-                if (rg.nextBoolean()) {
-
-                } else {
-
-                }
-            } else {
-
-                if (rg.nextBoolean()) {
-
-                } else {
-
-                }
-            }
-
         }
 
         @Override
@@ -136,50 +130,11 @@ public class SimpleExperiment {
             // every time step (tick) this gets called. Each time we chose a
             // different destination and move in that direction using the time
             // that was made available to us.
-            Point randomPosition = roadModel.getRandomPosition(rnd);
-
-            roadModel.moveTo(this, destination, timeLapse);
+            roadModel.moveTo(
+                    this,
+                    roadModel.getPosition(roadModel.getObjects().iterator()
+                            .next()), timeLapse);
         }
-
-        // private enum Side {
-        // UL(2, 3, 7, 8), UR(7, 8, 7, 8), DL(2, 3, 2, 3), DR(7, 8, 2, 3), Up(
-        // 3, 7, 7, 8), Down(3, 7, 2, 3), Left(2, 3, 3, 7), Right(7,
-        // 8, 3, 7), Inside(3, 7, 3, 7), Outside(0, 10, 0, 10);
-        //
-        // private final double up;
-        // private final double down;
-        // private final double left;
-        // private final double right;
-        // private final Random rg = new Random(123);
-        //
-        // Side(double left, double right, double down, double up) {
-        // this.up = up;
-        // this.down = down;
-        // this.left = left;
-        // this.right = right;
-        // }
-        //
-        // private Side insquare(Point pos) {
-        // for (Side side : Side.values()) {
-        // if (side.contains(pos))
-        // return side;
-        // }
-        // }
-        //
-        // public boolean contains(Point pos) {
-        // return pos.x >= left && pos.x <= right && pos.y >= down
-        // && pos.y <= up;
-        // }
-        //
-        // public Point transform(Point pos) {
-        // double x;
-        // double y;
-        // switch(insquare(pos)) {
-        // case UL: if(rg.nextBoolean()){ x = 2+0.6*pos.x;
-        // y =}
-        // }
-        // }
-        // }
 
         @Override
         public void afterTick(TimeLapse timeLapse) {
@@ -191,6 +146,25 @@ public class SimpleExperiment {
         public double getSpeed() {
             // the drivers speed
             return VEHICLE_SPEED;
+        }
+    }
+
+    // load the graph file
+    static Graph<MultiAttributeData> loadGraph(String name) {
+        try {
+            if (GRAPH_CACHE.containsKey(name)) {
+                return GRAPH_CACHE.get(name);
+            }
+            final Graph<MultiAttributeData> g = DotGraphSerializer
+                    .getMultiAttributeGraphSerializer(new SelfCycleFilter())
+                    .read(Greedy.class.getResourceAsStream(name));
+
+            GRAPH_CACHE.put(name, g);
+            return g;
+        } catch (final FileNotFoundException e) {
+            throw new IllegalStateException(e);
+        } catch (final IOException e) {
+            throw new IllegalStateException(e);
         }
     }
 }
