@@ -1,16 +1,18 @@
 package mas;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 
+import javax.swing.text.Position;
+
 import rinde.sim.core.TimeLapse;
+import rinde.sim.core.graph.Point;
 import rinde.sim.core.model.pdp.PDPModel;
 import rinde.sim.core.model.pdp.PDPModel.ParcelState;
 import rinde.sim.core.model.pdp.Parcel;
 import rinde.sim.core.model.road.RoadModel;
 import rinde.sim.core.model.road.RoadModels;
-import rinde.sim.core.model.road.RoadUser;
 import rinde.sim.pdptw.common.DefaultVehicle;
 import rinde.sim.pdptw.common.VehicleDTO;
 
@@ -43,22 +45,37 @@ class GreedyVehicle extends DefaultVehicle {
 		if (!time.hasTimeLeft()) {
 			return;
 		}
-		if (!curr.isPresent() && !pm.getParcels(ParcelState.values()).isEmpty()) {
-			List<Parcel> parcels = RoadModels.findClosestObjects(
-					rm.getPosition(this), rm, Parcel.class, 10);
-			List<Parcel> availableParcels = new ArrayList<Parcel>(
-					Collections2.filter(parcels, new Predicate<Parcel>() {
-						@Override
-						public boolean apply(Parcel parcel) {
-							return ParcelState.AVAILABLE == pm.getParcelState(parcel);
-						}
-					}));
-			Parcel parcel = availableParcels.isEmpty() ? parcels.get(0)
-					: availableParcels.get(0);
+		if (!curr.isPresent()) {
+			Parcel parcel = null;
+			if (!pm.getParcels(ParcelState.values()).isEmpty()) {
+				List<Parcel> parcels = RoadModels.findClosestObjects(
+						rm.getPosition(this), rm, Parcel.class, 20);
+				List<Parcel> availableParcels = new ArrayList<Parcel>(
+						Collections2.filter(parcels, new Predicate<Parcel>() {
+							@Override
+							public boolean apply(Parcel parcel) {
+								return ParcelState.AVAILABLE == pm
+										.getParcelState(parcel);
+							}
+						}));
+				parcel = availableParcels.isEmpty() ? null : availableParcels
+						.get(0);
+			}
+
+			double deliveryDistance = Double.POSITIVE_INFINITY;
+			for (Parcel delivery : pm.getContents(this)) {
+				double distance = Point.distance(rm.getPosition(this),
+						delivery.getDestination());
+				if (delivery.getDeliveryTimeWindow().isIn(time.getTime())
+						&& deliveryDistance > distance) {
+					parcel = delivery;
+					deliveryDistance = distance;
+				}
+			}
 			curr = Optional.fromNullable(parcel);
 		}
 
-		if (curr.isPresent() && ParcelState.AVAILABLE == pm.getParcelState(curr.get())) {
+		if (curr.isPresent()) {
 			final boolean inCargo = pm.containerContains(this, curr.get());
 			// sanity check: if it is not in our cargo AND it is also not on the
 			// RoadModel, we cannot go to curr anymore.
@@ -69,11 +86,13 @@ class GreedyVehicle extends DefaultVehicle {
 				rm.moveTo(this, curr.get().getDestination(), time);
 				if (rm.getPosition(this).equals(curr.get().getDestination())
 						&& curr.get().getDeliveryTimeWindow()
-								.isIn(time.getTime())) {
+								.isAfterStart(time.getTime())) {
 					// deliver when we arrive
 					pm.deliver(this, curr.get(), time);
+				} else {
+					curr = Optional.absent();
 				}
-			} else {
+			} else if (ParcelState.AVAILABLE == pm.getParcelState(curr.get())) {
 				// it is still available, go there as fast as possible
 				rm.moveTo(this, curr.get(), time);
 				if (rm.equalPosition(this, curr.get())
@@ -82,9 +101,9 @@ class GreedyVehicle extends DefaultVehicle {
 					// pickup customer
 					pm.pickup(this, curr.get(), time);
 				}
+			} else {
+				curr = Optional.absent();
 			}
-		} else if (curr.isPresent()){
-			curr = Optional.absent();
 		}
 	}
 
