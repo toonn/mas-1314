@@ -35,11 +35,14 @@ class SmartVehicle extends DefaultVehicle {
     if (!time.hasTimeLeft()) {
       return;
     }
+    
+    // Select current obsession
     if (!curr.isPresent()) {
       curr = Optional.fromNullable(RoadModels.findClosestObject(
           rm.getPosition(this), rm, Parcel.class));
     }
 
+    // Deal with current obsession
     if (curr.isPresent()) {
       final boolean inCargo = pm.containerContains(this, curr.get());
       // sanity check: if it is not in our cargo AND it is also not on the

@@ -26,9 +26,9 @@ import rinde.sim.ui.renderers.UiSchema;
  * 
  * @author Rinde van Lon <rinde.vanlon@cs.kuleuven.be>
  */
-public class Greedy {
+public class SmartVsGreedy {
 
-	private Greedy() {
+	private SmartVsGreedy() {
 	}
 
 	/**
@@ -38,7 +38,7 @@ public class Greedy {
 	 *            This is ignored.
 	 */
 	public static void main(String[] args) {
-		run(false);
+		run(true);
 	}
 
 	public static void run(final boolean testing) {
@@ -46,18 +46,20 @@ public class Greedy {
 			@Override
 			public void createUI(Simulator sim) {
 				final UiSchema schema = new UiSchema(false);
-				schema.add(GreedyVehicle.class, "/graphics/perspective/semi-truck-32.png");
+				schema.add(GreedyVehicle.class,
+						"/graphics/perspective/semi-truck-32.png");
 				schema.add(DefaultDepot.class,
 						"/graphics/flat/warehouse-32.png");
-				schema.add(DefaultParcel.class, "/graphics/perspective/deliverypackage.png");
+				schema.add(DefaultParcel.class,
+						"/graphics/perspective/deliverypackage.png");
 				final View.Builder viewBuilder = View.create(sim).with(
 						new PlaneRoadModelRenderer(),
 						new RoadUserRenderer(schema, false),
-						new RouteRenderer(),
-						new PDPModelRenderer(false));
+						new RouteRenderer(), new PDPModelRenderer(false));
 				if (testing) {
 					viewBuilder.enableAutoClose().enableAutoPlay()
-							.setSpeedUp(64).stopSimulatorAtTime(60 * 60 * 1000);
+							.setSpeedUp(64)
+							.stopSimulatorAtTime(10 * 60 * 60 * 1000);
 				}
 				viewBuilder.show();
 			}
@@ -66,15 +68,28 @@ public class Greedy {
 		final Gendreau06Scenario scenario = Gendreau06Parser
 				.parser()
 				.addFile(
-						Greedy.class
+						SmartVsGreedy.class
+								.getResourceAsStream("/req_rapide_1_240_24"),
+						"req_rapide_1_240_24").allowDiversion().parse().get(0);
+		final Gendreau06Scenario scenario2 = Gendreau06Parser
+				.parser()
+				.addFile(
+						SmartVsGreedy.class
 								.getResourceAsStream("/req_rapide_1_240_33"),
 						"req_rapide_1_240_33").allowDiversion().parse().get(0);
+		final Gendreau06Scenario scenario3 = Gendreau06Parser
+				.parser()
+				.addFile(
+						SmartVsGreedy.class
+								.getResourceAsStream("/req_rapide_1_450_24"),
+						"req_rapide_1_450_24").allowDiversion().parse().get(0);
 
 		final Gendreau06ObjectiveFunction objFunc = new Gendreau06ObjectiveFunction();
-		
-		for (SimulationResult result : Experiment.build(objFunc).withRandomSeed(123)
-				.addConfiguration(new Configuration(false))
-				.addScenario(scenario).showGui(uic).repeat(1).perform().results) {
+
+		for (SimulationResult result : Experiment.build(objFunc)
+				.withRandomSeed(123).addConfiguration(new Configuration(false))
+				.addScenario(scenario).addScenario(scenario2).addScenario(scenario3).showGui(uic)
+				.repeat(1).perform().results) {
 			System.out.println(result.stats);
 		}
 	}
