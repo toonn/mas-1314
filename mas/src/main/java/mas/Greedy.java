@@ -5,6 +5,7 @@ import rinde.sim.pdptw.common.DefaultDepot;
 import rinde.sim.pdptw.common.DefaultParcel;
 import rinde.sim.pdptw.common.RouteRenderer;
 import rinde.sim.pdptw.experiment.Experiment;
+import rinde.sim.pdptw.experiment.Experiment.SimulationResult;
 import rinde.sim.pdptw.gendreau06.Gendreau06ObjectiveFunction;
 import rinde.sim.pdptw.gendreau06.Gendreau06Parser;
 import rinde.sim.pdptw.gendreau06.Gendreau06Scenario;
@@ -27,8 +28,6 @@ import rinde.sim.ui.renderers.UiSchema;
  */
 public class Greedy {
 
-	// speed in km/h
-	static final double VEHICLE_SPEED = 5000 * 1000 / 3600;
 	private Greedy() {
 	}
 
@@ -72,8 +71,11 @@ public class Greedy {
 						"req_rapide_1_240_33").allowDiversion().parse().get(0);
 
 		final Gendreau06ObjectiveFunction objFunc = new Gendreau06ObjectiveFunction();
-		Experiment.build(objFunc).withRandomSeed(123)
+		
+		for (SimulationResult result : Experiment.build(objFunc).withRandomSeed(123)
 				.addConfiguration(new Configuration(false))
-				.addScenario(scenario).showGui(uic).repeat(1).perform();
+				.addScenario(scenario).showGui(uic).repeat(1).perform().results) {
+			System.out.println(result.stats);
+		}
 	}
 }
