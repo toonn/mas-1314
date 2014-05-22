@@ -1,5 +1,7 @@
 package mas;
 
+import org.eclipse.swt.graphics.RGB;
+
 import rinde.sim.core.Simulator;
 import rinde.sim.core.model.communication.CommunicationModel;
 import rinde.sim.core.model.road.RoadModel;
@@ -51,17 +53,23 @@ public class SmartVsGreedy {
 				final UiSchema schema = new UiSchema(false);
 				schema.add(GreedyVehicle.class,
 						"/graphics/perspective/semi-truck-32.png");
+				schema.add(SmartVehicle.class,
+						"/graphics/perspective/semi-truck-32.png");
 				schema.add(DefaultDepot.class,
 						"/graphics/flat/warehouse-32.png");
 				schema.add(DefaultParcel.class,
 						"/graphics/perspective/deliverypackage.png");
+				final UiSchema schema2 = new UiSchema();
+				schema2.add(SmartVehicle.C_VERMILLION, new RGB(227, 66, 52));
+				schema2.add(SmartVehicle.C_PERIWINKLE, new RGB(204, 204, 255));
+				schema2.add(SmartVehicle.C_MALACHITE, new RGB(11, 218, 81));
 				final View.Builder viewBuilder = View.create(sim).with(
 						new PlaneRoadModelRenderer(),
 						new RoadUserRenderer(schema, false),
 						new RouteRenderer(),
 						new PDPModelRenderer(false),
 						new MessagingLayerRenderer(sim.getModelProvider()
-								.getModel(RoadModel.class), schema));
+								.getModel(RoadModel.class), schema2));
 				if (testing) {
 					viewBuilder.enableAutoClose().enableAutoPlay()
 							.setSpeedUp(64)

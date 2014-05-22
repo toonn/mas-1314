@@ -1,10 +1,11 @@
 package mas;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Queue;
+import java.util.Set;
 
 import rinde.sim.core.TimeLapse;
 import rinde.sim.core.graph.Point;
@@ -35,7 +36,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private final Map<Parcel, BidMessage> ownBids = new HashMap<Parcel, BidMessage>();
 
 	private int commCounter = 0;
-	private final Map<CommunicationUser, Integer> commWith = new HashMap<CommunicationUser, Integer>();
+	private final Map<SmartVehicle, Integer> commWith = new HashMap<SmartVehicle, Integer>();
 	public static final String C_MALACHITE = "color.Malachite";
 	public static final String C_PERIWINKLE = "color.Periwinkle";
 	public static final String C_VERMILLION = "color.Vermillion";
@@ -63,8 +64,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 
 		// Select current obsession
 		if (!curr.isPresent()) {
-			curr = Optional.fromNullable(RoadModels.findClosestObject(
-					rm.getPosition(this), rm, Parcel.class));
+			curr = Optional.fromNullable(selectParcel(pm, rm));
 		}
 
 		// Deal with current obsession
@@ -90,6 +90,25 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 				}
 			}
 		}
+	}
+
+	private Parcel selectParcel(PDPModel pm, RoadModel rm) {
+		Parcel parcel = null;
+		long parcelEndTime = Long.MAX_VALUE;
+		for (BidMessage bid : commBids.senderMessages(this)) {
+			boolean inCargo = pm.containerContains(this, bid.getParcel());
+			if (!inCargo && !rm.containsObject(bid.getParcel())) {
+				commBids.purge(bid);
+			} else if (!inCargo &&
+				bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime){
+				parcel = bid.getParcel();
+				parcelEndTime = parcel.getDeliveryTimeWindow().end;
+			} else if (bid.getParcel().getPickupTimeWindow().end < parcelEndTime){
+				parcel = bid.getParcel();
+				parcelEndTime = parcel.getPickupTimeWindow().end;
+			}
+		}
+		return parcel;
 	}
 
 	@Override
@@ -129,29 +148,23 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		}
 	}
 
-	private void sendBids(long currentTime) {
-		if (lastCommunication + COMMUNICATION_PERIOD < currentTime) {
-			lastCommunication = currentTime;
-			if (cm != null) {
-				cm.broadcast(new Message(this) {
-				});
-			}
-		}
+	private void sendBid() {
+		cm.broadcast(commBids.yoink());
 	}
 
 	private void incrementCommWith() {
-		Iterator<CommunicationUser> it = commWith.keySet().iterator();
+		Iterator<SmartVehicle> it = commWith.keySet().iterator();
 		while (it.hasNext()) {
-			CommunicationUser key = it.next();
+			SmartVehicle key = it.next();
 			commWith.put(key, commWith.get(key) + 1);
 
 		}
 	}
 
 	private void refreshCommWith() {
-		Iterator<CommunicationUser> it = commWith.keySet().iterator();
+		Iterator<SmartVehicle> it = commWith.keySet().iterator();
 		while (it.hasNext()) {
-			CommunicationUser key = it.next();
+			SmartVehicle key = it.next();
 			if (commWith.get(key) > 60 * 100) {
 				it.remove();
 			}
@@ -161,6 +174,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public String getNoReceived() {
 		return "" + commCounter;
 	}
+	
+	public Set<SmartVehicle> getCommunicatedWith() {
+		return commWith.keySet();
+	}	
 
 	private class BidMessage extends Message {
 		private Parcel parcel;
@@ -222,6 +239,16 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			}
 		}
 
+		public Set<BidMessage> senderMessages(CommunicationUser sender) {
+			Set<BidMessage> sendersBids = new HashSet<SmartVehicle.BidMessage>();
+			for (BidMessage bid : bids.values()) {
+				if (bid.getSender() == sender) {
+					sendersBids.add(bid);
+				}
+			}
+			return sendersBids;
+		}
+
 		public BidMessage yoink() {
 			BidMessage bid = queue.poll();
 			bid.decrementTtl();
@@ -234,6 +261,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			}
 			return bid;
 		}
+		
+		public void purge(BidMessage target) {
+			bids.remove(target.getParcel());
+			queue.remove(target);
+		}
 	}
-
 }
