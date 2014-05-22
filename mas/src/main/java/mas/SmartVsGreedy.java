@@ -1,6 +1,9 @@
 package mas;
 
 import rinde.sim.core.Simulator;
+import rinde.sim.core.model.communication.CommunicationModel;
+import rinde.sim.core.model.road.RoadModel;
+import rinde.sim.examples.core.comm.MessagingLayerRenderer;
 import rinde.sim.pdptw.common.DefaultDepot;
 import rinde.sim.pdptw.common.DefaultParcel;
 import rinde.sim.pdptw.common.RouteRenderer;
@@ -55,7 +58,10 @@ public class SmartVsGreedy {
 				final View.Builder viewBuilder = View.create(sim).with(
 						new PlaneRoadModelRenderer(),
 						new RoadUserRenderer(schema, false),
-						new RouteRenderer(), new PDPModelRenderer(false));
+						new RouteRenderer(),
+						new PDPModelRenderer(false),
+						new MessagingLayerRenderer(sim.getModelProvider()
+								.getModel(RoadModel.class), schema));
 				if (testing) {
 					viewBuilder.enableAutoClose().enableAutoPlay()
 							.setSpeedUp(64)
@@ -88,8 +94,8 @@ public class SmartVsGreedy {
 
 		for (SimulationResult result : Experiment.build(objFunc)
 				.withRandomSeed(123).addConfiguration(new Configuration(false))
-				.addScenario(scenario).addScenario(scenario2).addScenario(scenario3).showGui(uic)
-				.repeat(1).perform().results) {
+				.addScenario(scenario).addScenario(scenario2)
+				.addScenario(scenario3).showGui(uic).repeat(1).perform().results) {
 			System.out.println(result.stats);
 		}
 	}
