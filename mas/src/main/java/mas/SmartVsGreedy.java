@@ -3,9 +3,7 @@ package mas;
 import org.eclipse.swt.graphics.RGB;
 
 import rinde.sim.core.Simulator;
-import rinde.sim.core.model.communication.CommunicationModel;
 import rinde.sim.core.model.road.RoadModel;
-import rinde.sim.examples.core.comm.MessagingLayerRenderer;
 import rinde.sim.pdptw.common.DefaultDepot;
 import rinde.sim.pdptw.common.DefaultParcel;
 import rinde.sim.pdptw.common.RouteRenderer;
@@ -59,7 +57,7 @@ public class SmartVsGreedy {
 						"/graphics/flat/warehouse-32.png");
 				schema.add(DefaultParcel.class,
 						"/graphics/perspective/deliverypackage.png");
-				final UiSchema schema2 = new UiSchema();
+				final UiSchema schema2 = new UiSchema(false);
 				schema2.add(SmartVehicle.C_VERMILLION, new RGB(227, 66, 52));
 				schema2.add(SmartVehicle.C_PERIWINKLE, new RGB(204, 204, 255));
 				schema2.add(SmartVehicle.C_MALACHITE, new RGB(11, 218, 81));
@@ -101,7 +99,7 @@ public class SmartVsGreedy {
 		final Gendreau06ObjectiveFunction objFunc = new Gendreau06ObjectiveFunction();
 
 		for (SimulationResult result : Experiment.build(objFunc)
-				.withRandomSeed(123).addConfiguration(new Configuration(false))
+				.withRandomSeed(123).addConfiguration(new Configuration(true))
 				.addScenario(scenario).addScenario(scenario2)
 				.addScenario(scenario3).showGui(uic).repeat(1).perform().results) {
 			System.out.println(result.stats);

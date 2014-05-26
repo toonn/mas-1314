@@ -104,7 +104,7 @@ class GreedyVehicle extends DefaultVehicle {
 			} else {
 				curr = Optional.absent();
 			}
-		} else if (pm.getParcels(ParcelState.ANNOUNCED).isEmpty()) {
+		} else if (pm.getParcels(ParcelState.ANNOUNCED, ParcelState.AVAILABLE).isEmpty()) {
 			rm.moveTo(this, RoadModels.findClosestObject(rm.getPosition(this),
 					rm, Depot.class), time);
 		}

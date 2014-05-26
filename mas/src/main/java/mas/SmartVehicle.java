@@ -1,5 +1,9 @@
 package mas;
 
+import static rinde.sim.core.model.pdp.PDPModel.ParcelState.ANNOUNCED;
+import static rinde.sim.core.model.pdp.PDPModel.ParcelState.AVAILABLE;
+
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -7,12 +11,17 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.math3.random.MersenneTwister;
+import org.apache.commons.math3.random.RandomGenerator;
+
 import rinde.sim.core.TimeLapse;
 import rinde.sim.core.graph.Point;
 import rinde.sim.core.model.communication.CommunicationAPI;
 import rinde.sim.core.model.communication.CommunicationUser;
 import rinde.sim.core.model.communication.Message;
+import rinde.sim.core.model.pdp.Depot;
 import rinde.sim.core.model.pdp.PDPModel;
+import rinde.sim.core.model.pdp.PDPModel.ParcelState;
 import rinde.sim.core.model.pdp.Parcel;
 import rinde.sim.core.model.road.RoadModel;
 import rinde.sim.core.model.road.RoadModels;
@@ -24,13 +33,11 @@ import com.google.common.base.Optional;
 /**
  * Implementation of a very simple taxi agent. It moves to the closest customer,
  * picks it up, then delivers it, repeat.
- * 
- * @author Rinde van Lon <rinde.vanlon@cs.kuleuven.be>
  */
 class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 
 	private CommunicationAPI cm;
-	private double commRadius = 1;
+	private double commRadius = 0.5;
 	private double commReliability = 0.8;
 	private final BidStore commBids = new BidStore();
 	private final Map<Parcel, BidMessage> ownBids = new HashMap<Parcel, BidMessage>();
@@ -41,7 +48,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public static final String C_PERIWINKLE = "color.Periwinkle";
 	public static final String C_VERMILLION = "color.Vermillion";
 
+	private final RandomGenerator rng = new MersenneTwister(123);
+	private int numAgents = 0;
+	private int numParcels = 0;
+	private int direction = 0;
+
 	private Optional<Parcel> curr = Optional.absent();
+	private int TTL = 5;
 
 	SmartVehicle(VehicleDTO dto) {
 		super(dto);
@@ -51,6 +64,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public void afterTick(TimeLapse timeLapse) {
 		incrementCommWith();
 		refreshCommWith();
+		Iterator<Parcel> it = ownBids.keySet().iterator();
+		while (it.hasNext()) {
+			ParcelState state = getPDPModel().getParcelState(it.next());
+			if (ANNOUNCED != state && AVAILABLE != state) {
+				it.remove();
+			}
+		}
 	}
 
 	@Override
@@ -62,12 +82,26 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			return;
 		}
 
+		Set<Parcel> parcelSet = new HashSet<Parcel>(getVisibleParcels(rm));
+
+		parcelSet.addAll(ownBids.keySet());
+		parcelSet.addAll(commBids.getParcels());
+
+		for (Parcel parcel : parcelSet) {
+			BidMessage bidMessage = new BidMessage(this, parcel, cost(pm, rm,
+					parcel), TTL);
+			ownBids.put(parcel, bidMessage);
+			commBids.ensconce(bidMessage);
+		}
+
+		sendBid();
+
 		// Select current obsession
 		if (!curr.isPresent()) {
 			curr = Optional.fromNullable(selectParcel(pm, rm));
 		}
 
-		// Deal with current obsession
+		// Deal with it
 		if (curr.isPresent()) {
 			final boolean inCargo = pm.containerContains(this, curr.get());
 			// sanity check: if it is not in our cargo AND it is also not on the
@@ -77,19 +111,50 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			} else if (inCargo) {
 				// if it is in cargo, go to its destination
 				rm.moveTo(this, curr.get().getDestination(), time);
-				if (rm.getPosition(this).equals(curr.get().getDestination())) {
+				if (rm.getPosition(this).equals(curr.get().getDestination())
+						&& curr.get().getDeliveryTimeWindow()
+								.isAfterStart(time.getTime())) {
 					// deliver when we arrive
 					pm.deliver(this, curr.get(), time);
 				}
 			} else {
 				// it is still available, go there as fast as possible
 				rm.moveTo(this, curr.get(), time);
-				if (rm.equalPosition(this, curr.get())) {
+				if (rm.equalPosition(this, curr.get())
+						&& AVAILABLE == pm.getParcelState(curr.get())) {
 					// pickup customer
 					pm.pickup(this, curr.get(), time);
 				}
 			}
+		} else if (pm.getParcels(ANNOUNCED, AVAILABLE).isEmpty()) {
+			rm.moveTo(this, RoadModels.findClosestObject(rm.getPosition(this),
+					rm, Depot.class), time);
+		} else {
+			int newNumAgents = RoadModels.findObjectsWithinRadius(
+					getPosition(), rm, commRadius, SmartVehicle.class).size();
+			int newNumParcels = RoadModels.findObjectsWithinRadius(
+					getPosition(), rm, commRadius, Parcel.class).size();
+			if ((newNumParcels - numParcels) < (newNumAgents - numAgents)) {
+				direction = rng.nextInt();
+			}
+			numAgents = newNumAgents;
+			numParcels = newNumParcels;
+
+			Point destination = new Point(
+					getPosition().x + Math.cos(direction), getPosition().y
+							+ Math.sin(direction));
+			rm.moveTo(this, destination, time);
+			// TODO scale direction
 		}
+	}
+
+	private double cost(PDPModel pm, RoadModel rm, Parcel parcel) {
+		return 10;
+	}
+
+	private Collection<Parcel> getVisibleParcels(RoadModel rm) {
+		return RoadModels.findObjectsWithinRadius(getPosition(), rm,
+				commRadius, Parcel.class);
 	}
 
 	private Parcel selectParcel(PDPModel pm, RoadModel rm) {
@@ -99,11 +164,11 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			boolean inCargo = pm.containerContains(this, bid.getParcel());
 			if (!inCargo && !rm.containsObject(bid.getParcel())) {
 				commBids.purge(bid);
-			} else if (!inCargo &&
-				bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime){
+			} else if (!inCargo
+					&& bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime) {
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getDeliveryTimeWindow().end;
-			} else if (bid.getParcel().getPickupTimeWindow().end < parcelEndTime){
+			} else if (bid.getParcel().getPickupTimeWindow().end < parcelEndTime) {
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getPickupTimeWindow().end;
 			}
@@ -149,7 +214,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	}
 
 	private void sendBid() {
-		cm.broadcast(commBids.yoink());
+		if (RoadModels.findObjectsWithinRadius(getPosition(), getRoadModel(),
+				commRadius, SmartVehicle.class).isEmpty())
+			return;
+		BidMessage bid = commBids.yoink();
+		if (bid != null && cm != null) {
+			cm.broadcast(bid);
+		}
 	}
 
 	private void incrementCommWith() {
@@ -174,10 +245,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public String getNoReceived() {
 		return "" + commCounter;
 	}
-	
+
 	public Set<SmartVehicle> getCommunicatedWith() {
 		return commWith.keySet();
-	}	
+	}
 
 	private class BidMessage extends Message {
 		private Parcel parcel;
@@ -239,6 +310,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			}
 		}
 
+		public Collection<Parcel> getParcels() {
+			return bids.keySet();
+		}
+
 		public Set<BidMessage> senderMessages(CommunicationUser sender) {
 			Set<BidMessage> sendersBids = new HashSet<SmartVehicle.BidMessage>();
 			for (BidMessage bid : bids.values()) {
@@ -251,9 +326,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 
 		public BidMessage yoink() {
 			BidMessage bid = queue.poll();
+			if (bid == null)
+				return null;
 			bid.decrementTtl();
 			if (bid.getTtl() > 0)
 				queue.offer(bid);
+			else
+				bids.remove(bid.getParcel());
 			try {
 				return bid.clone();
 			} catch (CloneNotSupportedException e) {
@@ -261,7 +340,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			}
 			return bid;
 		}
-		
+
 		public void purge(BidMessage target) {
 			bids.remove(target.getParcel());
 			queue.remove(target);
