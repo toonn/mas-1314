@@ -103,9 +103,9 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		sendBid();
 
 		// Select current obsession
-		if (!curr.isPresent()) {
-			curr = Optional.fromNullable(selectParcel(pm, rm));
-		}
+		// if (!curr.isPresent()) {
+		curr = Optional.fromNullable(selectParcel(pm, rm));
+		// }
 
 		// Deal with it
 		if (curr.isPresent()) {
@@ -130,6 +130,8 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 						&& AVAILABLE == pm.getParcelState(curr.get())) {
 					// pickup customer
 					pm.pickup(this, curr.get(), time);
+					commBids.purge(ownBids.get(curr.get()));
+					ownBids.remove(curr.get());
 				}
 			}
 		} else if (pm.getParcels(ANNOUNCED, AVAILABLE).isEmpty()) {
@@ -231,6 +233,15 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			} else if (bid.getParcel().getPickupTimeWindow().end < parcelEndTime) {
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getPickupTimeWindow().end;
+			}
+		}
+		if (parcel == null) {
+			Set<Parcel> cargo = pm.getContents(this);
+			for (Parcel p : cargo) {
+				if (p.getDeliveryTimeWindow().begin < parcelEndTime) {
+					parcel = p;
+					parcelEndTime = p.getDeliveryTimeWindow().begin;
+				}
 			}
 		}
 		return parcel;
@@ -366,11 +377,6 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 					bids.put(parcel, bidMessage);
 				} else if (bidMessage.getBid() == oldBid.getBid()
 						&& bidMessage.getTiebreaker() > oldBid.getTiebreaker()) {
-					queue.set(queue.indexOf(oldBid), bidMessage);
-					bids.put(parcel, bidMessage);
-				} else if (bidMessage.getBid() == oldBid.getBid()
-						&& bidMessage.getTiebreaker() == oldBid.getTiebreaker()
-						&& bidMessage.getTtl() > oldBid.getTtl()) {
 					queue.set(queue.indexOf(oldBid), bidMessage);
 					bids.put(parcel, bidMessage);
 				} else if (bidMessage.getSender() == oldBid.getSender()) {
