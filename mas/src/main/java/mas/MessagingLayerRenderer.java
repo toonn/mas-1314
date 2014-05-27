@@ -27,7 +27,6 @@ public class MessagingLayerRenderer implements CanvasRenderer {
 
   @Override
   public void renderDynamic(GC gc, ViewPort vp, long time) {
-	  System.out.println("we're all gonna die!!!!");
     final int size = 4;
     uiSchema.initialize(gc.getDevice());
 

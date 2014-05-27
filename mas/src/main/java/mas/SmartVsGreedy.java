@@ -71,7 +71,7 @@ public class SmartVsGreedy {
 				if (testing) {
 					viewBuilder.enableAutoClose().enableAutoPlay()
 							.setSpeedUp(64)
-							.stopSimulatorAtTime(10 * 60 * 60 * 1000);
+							.stopSimulatorAtTime(100 * 60 * 60 * 1000);
 				}
 				viewBuilder.show();
 			}

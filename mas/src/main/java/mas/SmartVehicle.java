@@ -40,7 +40,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private double commRadius = 0.5;
 	private double commReliability = 0.8;
 	private final BidStore commBids = new BidStore();
-	private final Map<Parcel, BidMessage> ownBids = new HashMap<Parcel, BidMessage>();
+	private final Map<Parcel, BidMessage> ownBids = new HashMap<Parcel, SmartVehicle.BidMessage>();
 
 	private int commCounter = 0;
 	private final Map<SmartVehicle, Integer> commWith = new HashMap<SmartVehicle, Integer>();
@@ -48,13 +48,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public static final String C_PERIWINKLE = "color.Periwinkle";
 	public static final String C_VERMILLION = "color.Vermillion";
 
-	private final RandomGenerator rng = new MersenneTwister(123);
-	private int numAgents = 0;
-	private int numParcels = 0;
-	private int direction = 0;
+	private static final RandomGenerator rng = new MersenneTwister(123);
+	private long direction = 0;
 
 	private Optional<Parcel> curr = Optional.absent();
-	private int TTL = 5;
+	private int TTL = 500;
+	private final double scalingFactor = 0.5 * commRadius;
+	private Point destination;
 
 	SmartVehicle(VehicleDTO dto) {
 		super(dto);
@@ -64,11 +64,15 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	public void afterTick(TimeLapse timeLapse) {
 		incrementCommWith();
 		refreshCommWith();
+
+		Set<Parcel> knownParcels = commBids.senderParcels(this);
 		Iterator<Parcel> it = ownBids.keySet().iterator();
 		while (it.hasNext()) {
-			ParcelState state = getPDPModel().getParcelState(it.next());
-			if (ANNOUNCED != state && AVAILABLE != state) {
+			Parcel parcel = it.next();
+			if (ownBids.get(parcel).getTtl() <= 0) {
 				it.remove();
+			} else if (!knownParcels.contains(parcel)) {
+				ownBids.get(parcel).decrementTtl();
 			}
 		}
 	}
@@ -84,14 +88,16 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 
 		Set<Parcel> parcelSet = new HashSet<Parcel>(getVisibleParcels(rm));
 
-		parcelSet.addAll(ownBids.keySet());
 		parcelSet.addAll(commBids.getParcels());
 
 		for (Parcel parcel : parcelSet) {
 			BidMessage bidMessage = new BidMessage(this, parcel, cost(pm, rm,
 					parcel), TTL);
-			ownBids.put(parcel, bidMessage);
-			commBids.ensconce(bidMessage);
+			if (!ownBids.containsKey(parcel)
+					|| bidMessage.getBid() != ownBids.get(parcel).getBid()) {
+				ownBids.put(parcel, bidMessage);
+				commBids.ensconce(bidMessage);
+			}
 		}
 
 		sendBid();
@@ -130,22 +136,76 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			rm.moveTo(this, RoadModels.findClosestObject(rm.getPosition(this),
 					rm, Depot.class), time);
 		} else {
-			int newNumAgents = RoadModels.findObjectsWithinRadius(
-					getPosition(), rm, commRadius, SmartVehicle.class).size();
-			int newNumParcels = RoadModels.findObjectsWithinRadius(
-					getPosition(), rm, commRadius, Parcel.class).size();
-			if ((newNumParcels - numParcels) < (newNumAgents - numAgents)) {
-				direction = rng.nextInt();
+			Collection<Parcel> parcels = RoadModels.findObjectsWithinRadius(
+					getPosition(), rm, commRadius, Parcel.class);
+			Collection<SmartVehicle> agents = RoadModels
+					.findObjectsWithinRadius(getPosition(), rm, commRadius,
+							SmartVehicle.class);
+			Point newDestination = new Point(0, 0);
+			for (Parcel parcel : parcels) {
+				newDestination = pointAdd(newDestination,
+						Point.diff(rm.getPosition(parcel), getPosition()));
 			}
-			numAgents = newNumAgents;
-			numParcels = newNumParcels;
+			for (SmartVehicle agent : agents) {
+				newDestination = Point.diff(newDestination, Point.divide(
+						Point.diff(rm.getPosition(agent), getPosition()), 0.1));
+			}
+			if (!new Point(0, 0).equals(newDestination)) {
+				destination = pointAdd(
+						getPosition(),
+						Point.divide(newDestination,
+								Point.distance(new Point(0, 0), newDestination)
+										/ scalingFactor));
+			} else if (null != destination) {
+				destination = pointAdd(Point.divide(
+						Point.diff(destination, getPosition()),
+						Point.distance(destination, getPosition())
+								/ scalingFactor), getPosition());
+			} else {
+				destination = rm.getRandomPosition(rng);
+			}
 
-			Point destination = new Point(
-					getPosition().x + Math.cos(direction), getPosition().y
-							+ Math.sin(direction));
+			while (!inBounds(rm, destination)) {
+				direction = rng.nextLong();
+				destination = movementVector(time);
+			}
 			rm.moveTo(this, destination, time);
-			// TODO scale direction
 		}
+	}
+
+	private Point pointAdd(Point p1, Point p2) {
+		return Point.diff(p1, Point.divide(p2, -1));
+	}
+
+	private Point movementVector(TimeLapse time) {
+		Point destination = new Point(getPosition().x + Math.cos(direction)
+				* scalingFactor, getPosition().y + Math.sin(direction)
+				* scalingFactor);
+		return destination;
+	}
+
+	/**
+	 * Assume the roadmodel is square.
+	 */
+	private boolean inBounds(RoadModel rm, Point point) {
+		double min = Double.POSITIVE_INFINITY;
+		double max = Double.NEGATIVE_INFINITY;
+		for (Point boundPoint : rm.getBounds()) {
+			if (boundPoint.x < min)
+				min = boundPoint.x;
+			if (boundPoint.x > max)
+				max = boundPoint.x;
+			if (boundPoint.y < min)
+				min = boundPoint.y;
+			if (boundPoint.y > max)
+				max = boundPoint.y;
+		}
+
+		if (point.x >= min && point.x <= max && point.y >= min
+				&& point.y <= max)
+			return true;
+		else
+			return false;
 	}
 
 	private double cost(PDPModel pm, RoadModel rm, Parcel parcel) {
@@ -214,10 +274,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	}
 
 	private void sendBid() {
+		BidMessage bid = commBids.yoink();
 		if (RoadModels.findObjectsWithinRadius(getPosition(), getRoadModel(),
 				commRadius, SmartVehicle.class).isEmpty())
 			return;
-		BidMessage bid = commBids.yoink();
 		if (bid != null && cm != null) {
 			cm.broadcast(bid);
 		}
@@ -254,6 +314,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		private Parcel parcel;
 		private double bid;
 		private int ttl;
+		private final long tiebreaker = rng.nextLong();
 
 		public BidMessage(CommunicationUser sender, Parcel parcel, double bid,
 				int timeToLive) {
@@ -285,6 +346,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			ttl--;
 		}
 
+		public long getTiebreaker() {
+			return tiebreaker;
+		}
+
 	}
 
 	private class BidStore {
@@ -300,7 +365,15 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 					queue.offer(bidMessage);
 					bids.put(parcel, bidMessage);
 				} else if (bidMessage.getBid() == oldBid.getBid()
+						&& bidMessage.getTiebreaker() > oldBid.getTiebreaker()) {
+					queue.set(queue.indexOf(oldBid), bidMessage);
+					bids.put(parcel, bidMessage);
+				} else if (bidMessage.getBid() == oldBid.getBid()
+						&& bidMessage.getTiebreaker() == oldBid.getTiebreaker()
 						&& bidMessage.getTtl() > oldBid.getTtl()) {
+					queue.set(queue.indexOf(oldBid), bidMessage);
+					bids.put(parcel, bidMessage);
+				} else if (bidMessage.getSender() == oldBid.getSender()) {
 					queue.set(queue.indexOf(oldBid), bidMessage);
 					bids.put(parcel, bidMessage);
 				}
@@ -319,6 +392,16 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			for (BidMessage bid : bids.values()) {
 				if (bid.getSender() == sender) {
 					sendersBids.add(bid);
+				}
+			}
+			return sendersBids;
+		}
+
+		public Set<Parcel> senderParcels(CommunicationUser sender) {
+			Set<Parcel> sendersBids = new HashSet<Parcel>();
+			for (BidMessage bid : bids.values()) {
+				if (bid.getSender() == sender) {
+					sendersBids.add(bid.getParcel());
 				}
 			}
 			return sendersBids;
