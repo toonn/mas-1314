@@ -52,7 +52,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private long direction = 0;
 
 	private Optional<Parcel> curr = Optional.absent();
-	private int TTL = 500;
+	private int TTL = 5;
 	private final double scalingFactor = 0.5 * commRadius;
 	private Point destination;
 
@@ -226,11 +226,12 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			boolean inCargo = pm.containerContains(this, bid.getParcel());
 			if (!inCargo && !rm.containsObject(bid.getParcel())) {
 				commBids.purge(bid);
-			} else if (!inCargo
+			} else if (inCargo
 					&& bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime) {
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getDeliveryTimeWindow().end;
-			} else if (bid.getParcel().getPickupTimeWindow().end < parcelEndTime) {
+			} else if (!inCargo
+					&& bid.getParcel().getPickupTimeWindow().end < parcelEndTime) {
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getPickupTimeWindow().end;
 			}
@@ -285,10 +286,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	}
 
 	private void sendBid() {
-		BidMessage bid = commBids.yoink();
 		if (RoadModels.findObjectsWithinRadius(getPosition(), getRoadModel(),
 				commRadius, SmartVehicle.class).isEmpty())
 			return;
+		BidMessage bid = commBids.yoink();
 		if (bid != null && cm != null) {
 			cm.broadcast(bid);
 		}

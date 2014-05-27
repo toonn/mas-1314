@@ -1,5 +1,8 @@
 package mas;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.eclipse.swt.graphics.RGB;
 
 import rinde.sim.core.Simulator;
@@ -70,39 +73,41 @@ public class SmartVsGreedy {
 								.getModel(RoadModel.class), schema2));
 				if (testing) {
 					viewBuilder.enableAutoClose().enableAutoPlay()
-							.setSpeedUp(64)
+							.setSpeedUp(128)
 							.stopSimulatorAtTime(100 * 60 * 60 * 1000);
 				}
 				viewBuilder.show();
 			}
 		};
 
-		final Gendreau06Scenario scenario = Gendreau06Parser
-				.parser()
-				.addFile(
-						SmartVsGreedy.class
-								.getResourceAsStream("/req_rapide_1_240_24"),
-						"req_rapide_1_240_24").allowDiversion().parse().get(0);
-		final Gendreau06Scenario scenario2 = Gendreau06Parser
-				.parser()
-				.addFile(
-						SmartVsGreedy.class
-								.getResourceAsStream("/req_rapide_1_240_33"),
-						"req_rapide_1_240_33").allowDiversion().parse().get(0);
-		final Gendreau06Scenario scenario3 = Gendreau06Parser
-				.parser()
-				.addFile(
-						SmartVsGreedy.class
-								.getResourceAsStream("/req_rapide_1_450_24"),
-						"req_rapide_1_450_24").allowDiversion().parse().get(0);
-
 		final Gendreau06ObjectiveFunction objFunc = new Gendreau06ObjectiveFunction();
 
-		for (SimulationResult result : Experiment.build(objFunc)
-				.withRandomSeed(123).addConfiguration(new Configuration(true))
-				.addScenario(scenario).addScenario(scenario2)
-				.addScenario(scenario3).showGui(uic).repeat(1).perform().results) {
-			System.out.println(result.stats);
+		List<String> gendreauResources = new LinkedList<String>();
+		int[] nr = { 1, 2, 3, 4, 5 };
+		int[] lod = { 240, 240, 450 };
+		int[] freq = { 24, 33, 24 };
+		for (int i : nr) {
+			for (int j = 0; j < 3; j++) {
+				gendreauResources.add("req_rapide_" + i + "_" + lod[j] + "_"
+						+ freq[j]);
+			}
+		}
+
+		for (String resource : gendreauResources) {
+			final Gendreau06Scenario scenario = Gendreau06Parser
+					.parser()
+					.addFile(
+							SmartVsGreedy.class.getResourceAsStream("/"
+									+ resource), resource).allowDiversion()
+					.parse().get(0);
+
+			for (SimulationResult result : Experiment.build(objFunc)
+					.withRandomSeed(123)
+					.addConfiguration(new Configuration(true))
+					.addScenario(scenario).showGui(uic).repeat(3).perform().results) {
+				System.out.println(result.stats);
+				//TODO statistieken
+			}
 		}
 	}
 }
