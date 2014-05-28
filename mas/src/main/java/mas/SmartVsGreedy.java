@@ -1,5 +1,8 @@
 package mas;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -114,11 +117,11 @@ public class SmartVsGreedy {
 			for (SimulationResult result : Experiment.build(objFunc)
 					.withRandomSeed(123).addConfiguration(configuration)
 					.addScenario(scenario)/* .showGui(uic) */.repeat(3).perform().results) {
+
 				expStats.addStats(result.stats);
 			}
 			configStats.put(configuration.toString(), expStats);
 			experimentStats.put(resource, configStats);
-			System.out.println(expStats);
 		}
 
 		String json = "{ ";
@@ -138,6 +141,27 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
+		writeTextFile("../smartvehicle_cost10_noplan.json", json);
+	}
+
+	public void writeTextFile(String fileName, String s) {
+		FileWriter output = null;
+		try {
+			output = new FileWriter(fileName);
+			BufferedWriter writer = new BufferedWriter(output);
+			writer.write(s);
+			writer.close();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		} finally {
+			if (output != null) {
+				try {
+					output.close();
+				} catch (IOException e) {
+					// Ignore issues during closing
+				}
+			}
+		}
 
 	}
 
