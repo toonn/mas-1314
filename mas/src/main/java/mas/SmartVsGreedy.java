@@ -141,7 +141,7 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile("../smartvehicle_cost10_noplan.json", json);
+		writeTextFile("../smartvehicle_cost10_plan.json", json);
 	}
 
 	public void writeTextFile(String fileName, String s) {

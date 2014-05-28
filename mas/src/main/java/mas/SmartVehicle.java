@@ -100,7 +100,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			BidMessage bidMessage = new BidMessage(this, parcel, cost(pm, rm,
 					parcel), TTL);
 			// If it's not in ownBids it's new so bid on it anyway
-			// If you're bidding the same amount as the last time don't 
+			// If you're bidding the same amount as the last time don't
 			// update the bid so the ttl and tiebreaker stay the same
 			if (!ownBids.containsKey(parcel)
 					|| bidMessage.getBid() != ownBids.get(parcel).getBid()) {
@@ -148,7 +148,8 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			rm.moveTo(this, RoadModels.findClosestObject(rm.getPosition(this),
 					rm, Depot.class), time);
 		} else {
-			// If there are still parcels to be delivered but we can't go to pick up
+			// If there are still parcels to be delivered but we can't go to
+			// pick up
 			// any of them wander around toward parcels but away from agents
 			Collection<Parcel> parcels = RoadModels.findObjectsWithinRadius(
 					getPosition(), rm, commRadius, Parcel.class);
@@ -171,13 +172,14 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 								Point.distance(new Point(0, 0), newDestination)
 										/ scalingFactor));
 			} else if (null != destination) {
-				// 
+				//
 				destination = pointAdd(Point.divide(
 						Point.diff(destination, getPosition()),
 						Point.distance(destination, getPosition())
 								/ scalingFactor), getPosition());
 			} else {
-				// only happens in the beginning, if we don't have a destination randomly pick one
+				// only happens in the beginning, if we don't have a destination
+				// randomly pick one
 				destination = rm.getRandomPosition(rng);
 			}
 
@@ -234,6 +236,8 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	}
 
 	private Parcel selectParcel(PDPModel pm, RoadModel rm) {
+		// voor tien hoogste bids, cumulatieve gewogen som van bids, pas met een
+		// 'serieuze' verbetering wisselen.
 		Parcel parcel = null;
 		long parcelEndTime = Long.MAX_VALUE;
 		for (BidMessage bid : commBids.senderMessages(this)) {
