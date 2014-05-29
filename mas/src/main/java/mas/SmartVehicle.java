@@ -4,11 +4,16 @@ import static rinde.sim.core.model.pdp.PDPModel.ParcelState.ANNOUNCED;
 import static rinde.sim.core.model.pdp.PDPModel.ParcelState.AVAILABLE;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Random;
 import java.util.Set;
 
 import org.apache.commons.math3.random.MersenneTwister;
@@ -21,7 +26,6 @@ import rinde.sim.core.model.communication.CommunicationUser;
 import rinde.sim.core.model.communication.Message;
 import rinde.sim.core.model.pdp.Depot;
 import rinde.sim.core.model.pdp.PDPModel;
-import rinde.sim.core.model.pdp.PDPModel.ParcelState;
 import rinde.sim.core.model.pdp.Parcel;
 import rinde.sim.core.model.road.RoadModel;
 import rinde.sim.core.model.road.RoadModels;
@@ -39,7 +43,6 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private CommunicationAPI cm;
 	private double commRadius = 0.5;
 	private double commReliability = 0.8;
-	private final BidStore commBids = new BidStore();
 	private final Map<Parcel, BidMessage> ownBids = new HashMap<Parcel, SmartVehicle.BidMessage>();
 
 	private int commCounter = 0;
@@ -55,6 +58,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private int TTL = 5;
 	private final double scalingFactor = 0.5 * commRadius;
 	private Point destination;
+	private int nrConsideredFutures = 10;
+	private int nrFutureBackers = 42;
+	private double inertialThreshold = 1 + 0.1;
+
+	private double currentFutureValue = Double.MIN_VALUE;
+
+	private final BidStore commBids = new BidStore();
 
 	SmartVehicle(VehicleDTO dto) {
 		super(dto);
@@ -92,21 +102,18 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		}
 
 		// Look at all the parcels you can see (new or not)
-		Set<Parcel> parcelSet = new HashSet<Parcel>(getVisibleParcels(rm));
+		Set<Parcel> parcelSet = new HashSet<Parcel>(getVisibleParcels(pm, rm));
 		// add the ones you've heard about or are bidding on yourself
-		parcelSet.addAll(commBids.getParcels());
+		parcelSet.removeAll(commBids.getParcels());
 		// Bid on all of them if appropriate
 		for (Parcel parcel : parcelSet) {
-			BidMessage bidMessage = new BidMessage(this, parcel, cost(pm, rm,
-					parcel), TTL);
-			// If it's not in ownBids it's new so bid on it anyway
-			// If you're bidding the same amount as the last time don't
-			// update the bid so the ttl and tiebreaker stay the same
-			if (!ownBids.containsKey(parcel)
-					|| bidMessage.getBid() != ownBids.get(parcel).getBid()) {
-				ownBids.put(parcel, bidMessage);
-				commBids.ensconce(bidMessage);
-			}
+			storeOwnBid(new BidMessage(this, parcel, cost(pm, rm,
+					getPosition(), pm.getContents(this), parcel), TTL));
+		}
+		for (BidMessage bid : commBids.getBids()) {
+			storeOwnBid(new BidMessage(this, bid.getParcel(), cost(pm, rm,
+					getPosition(), pm.getContents(this), bid.getParcel()), TTL,
+					bid.getPosition()));
 		}
 
 		sendBid();
@@ -126,7 +133,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			} else if (inCargo) {
 				// if it is in cargo, go to its destination
 				rm.moveTo(this, curr.get().getDestination(), time);
-				if (rm.getPosition(this).equals(curr.get().getDestination())
+				if (getPosition().equals(curr.get().getDestination())
 						&& curr.get().getDeliveryTimeWindow()
 								.isAfterStart(time.getTime())) {
 					// deliver when we arrive
@@ -145,8 +152,8 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			}
 		} else if (pm.getParcels(ANNOUNCED, AVAILABLE).isEmpty()) {
 			// If there are no more parcels to be delivered go back to the depot
-			rm.moveTo(this, RoadModels.findClosestObject(rm.getPosition(this),
-					rm, Depot.class), time);
+			rm.moveTo(this, RoadModels.findClosestObject(getPosition(), rm,
+					Depot.class), time);
 		} else {
 			// If there are still parcels to be delivered but we can't go to
 			// pick up
@@ -191,6 +198,17 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		}
 	}
 
+	private void storeOwnBid(BidMessage bid) {
+		// If it's not in ownBids it's new so bid on it anyway
+		// If you're bidding the same amount as the last time don't
+		// update the bid so the ttl and tiebreaker stay the same
+		if (!ownBids.containsKey(bid.getParcel())
+				|| bid.getBid() != ownBids.get(bid.getParcel()).getBid()) {
+			ownBids.put(bid.getParcel(), bid);
+			commBids.ensconce(bid);
+		}
+	}
+
 	private Point pointAdd(Point p1, Point p2) {
 		return Point.diff(p1, Point.divide(p2, -1));
 	}
@@ -226,40 +244,103 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			return false;
 	}
 
-	private double cost(PDPModel pm, RoadModel rm, Parcel parcel) {
+	private double cost(PDPModel pm, RoadModel rm, Point position,
+			Collection<Parcel> cargo, Parcel parcel) {
 		return 10;
 	}
 
-	private Collection<Parcel> getVisibleParcels(RoadModel rm) {
-		return RoadModels.findObjectsWithinRadius(getPosition(), rm,
-				commRadius, Parcel.class);
+	private Collection<Parcel> getVisibleParcels(PDPModel pm, RoadModel rm) {
+		Collection<Parcel> visibleParcels = RoadModels.findObjectsWithinRadius(
+				getPosition(), rm, commRadius, Parcel.class);
+		Iterator<Parcel> it = visibleParcels.iterator();
+		while (it.hasNext()) {
+			Parcel p = it.next();
+			if (pm.getParcelState(p) != ANNOUNCED
+					&& pm.getParcelState(p) != AVAILABLE)
+				it.remove();
+		}
+
+		return visibleParcels;
 	}
 
 	private Parcel selectParcel(PDPModel pm, RoadModel rm) {
 		// voor tien hoogste bids, cumulatieve gewogen som van bids, pas met een
 		// 'serieuze' verbetering wisselen.
-		Parcel parcel = null;
-		long parcelEndTime = Long.MAX_VALUE;
-		for (BidMessage bid : commBids.senderMessages(this)) {
-			boolean inCargo = pm.containerContains(this, bid.getParcel());
-			if (!inCargo && !rm.containsObject(bid.getParcel())) {
-				commBids.purge(bid);
-			} else if (inCargo
-					&& bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime) {
-				parcel = bid.getParcel();
-				parcelEndTime = parcel.getDeliveryTimeWindow().end;
-			} else if (!inCargo
-					&& bid.getParcel().getPickupTimeWindow().end < parcelEndTime) {
-				parcel = bid.getParcel();
-				parcelEndTime = parcel.getPickupTimeWindow().end;
+		BidMessage future = null;
+		double cumulativeFutureCost = Double.NEGATIVE_INFINITY;
+
+		List<BidMessage> backers = new LinkedList<BidMessage>();
+		Collections.shuffle(
+				new LinkedList<BidMessage>(commBids.senderMessages(this)),
+				new Random(rng.nextLong()));
+		backers = backers.subList(0, Math.min(nrFutureBackers, backers.size()));
+
+		LinkedList<BidMessage> futureCandidates = commBids.futures(this,
+				nrConsideredFutures);
+		// commBids.futures returns a list sorted from highest to lowest bid
+		BidMessage smallest = futureCandidates.peekLast();
+		for (Parcel p : pm.getContents(this)) {
+			double pCost = cost(pm, rm, getPosition(), pm.getContents(this), p);
+			if (smallest == null || pCost > smallest.getBid()) {
+				futureCandidates.offer(new BidMessage(this, p, pCost, TTL,
+						getPosition()));
 			}
 		}
+		for (BidMessage futureCandidate : futureCandidates) {
+			Point futurePosition;
+			Collection<Parcel> cargo = new LinkedList<Parcel>(
+					pm.getContents(this));
+			Parcel candidateParcel = futureCandidate.getParcel();
+			if (pm.containerContains(this, candidateParcel)) {
+				futurePosition = candidateParcel.getDestination();
+			} else {
+				if (!getVisibleParcels(pm, rm).contains(candidateParcel)
+						&& Point.distance(getPosition(),
+								futureCandidate.getPosition()) < commRadius) {
+					commBids.purge(futureCandidate);
+					ownBids.remove(futureCandidate);
+					continue;
+				}
+				futurePosition = futureCandidate.getPosition();
+				cargo.add(candidateParcel);
+			}
+
+			double cumSum = 0;
+			for (BidMessage backer : backers) {
+				cumSum += cost(pm, rm, futurePosition, cargo,
+						backer.getParcel());
+			}
+			if (cumSum > cumulativeFutureCost) {
+				cumulativeFutureCost = cumSum;
+				future = futureCandidate;
+			}
+
+		}
+		Parcel parcel = null;
+		if (curr.isPresent()) {
+			for (BidMessage bid : commBids.senderMessages(this)) {
+				if (bid.getParcel().equals(curr.get())) {
+					parcel = curr.get();
+					break;
+				}
+			}
+		}
+		if (future != null
+				&& (!curr.isPresent() || cumulativeFutureCost
+						/ currentFutureValue > inertialThreshold))
+			parcel = future.getParcel();
+
 		if (parcel == null) {
-			Set<Parcel> cargo = pm.getContents(this);
-			for (Parcel p : cargo) {
-				if (p.getDeliveryTimeWindow().begin < parcelEndTime) {
-					parcel = p;
-					parcelEndTime = p.getDeliveryTimeWindow().begin;
+			if (pm.getContents(this).isEmpty() && !futureCandidates.isEmpty()) {
+				parcel = futureCandidates.poll().getParcel();
+			} else {
+				double parcelEndTime = Double.POSITIVE_INFINITY;
+				Set<Parcel> cargo = pm.getContents(this);
+				for (Parcel p : cargo) {
+					if (p.getDeliveryTimeWindow().begin < parcelEndTime) {
+						parcel = p;
+						parcelEndTime = p.getDeliveryTimeWindow().begin;
+					}
 				}
 			}
 		}
@@ -304,12 +385,18 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	}
 
 	private void sendBid() {
-		if (RoadModels.findObjectsWithinRadius(getPosition(), getRoadModel(),
-				commRadius, SmartVehicle.class).isEmpty())
+		Collection<SmartVehicle> receivers = RoadModels
+				.findObjectsWithinRadius(getPosition(), getRoadModel(),
+						commRadius, SmartVehicle.class);
+		receivers.remove(this);
+		if (receivers.isEmpty())
 			return;
 		BidMessage bid = commBids.yoink();
 		if (bid != null && cm != null) {
 			cm.broadcast(bid);
+			for (SmartVehicle receiver : receivers) {
+				commWith.put(receiver, 0);
+			}
 		}
 	}
 
@@ -326,7 +413,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		Iterator<SmartVehicle> it = commWith.keySet().iterator();
 		while (it.hasNext()) {
 			SmartVehicle key = it.next();
-			if (commWith.get(key) > 60 * 100) {
+			if (commWith.get(key) > 100) {
 				it.remove();
 			}
 		}
@@ -344,20 +431,52 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		private Parcel parcel;
 		private double bid;
 		private int ttl;
-		private final long tiebreaker = rng.nextLong();
+		private final long tiebreaker;
+		private final Point position;
+		private final CommunicationUser originalSender;
 
 		public BidMessage(CommunicationUser sender, Parcel parcel, double bid,
 				int timeToLive) {
 			super(sender);
+			this.originalSender = sender;
 			this.parcel = parcel;
 			this.bid = bid;
 			this.ttl = timeToLive;
+			this.tiebreaker = rng.nextLong();
+			this.position = getRoadModel().getPosition(parcel);
+		}
+
+		public BidMessage(CommunicationUser sender, Parcel parcel, double bid,
+				int timeToLive, Point position) {
+			super(sender);
+			this.originalSender = sender;
+			this.parcel = parcel;
+			this.bid = bid;
+			this.ttl = timeToLive;
+			this.tiebreaker = rng.nextLong();
+			this.position = position;
+		}
+
+		private BidMessage(CommunicationUser sender,
+				CommunicationUser originalSender, Parcel parcel, double bid,
+				int timeToLive, long tiebreaker, Point position) {
+			super(sender);
+			this.originalSender = originalSender;
+			this.parcel = parcel;
+			this.bid = bid;
+			this.ttl = timeToLive;
+			this.tiebreaker = tiebreaker;
+			this.position = position;
 		}
 
 		@Override
 		public BidMessage clone() throws CloneNotSupportedException {
 			return (BidMessage) super.clone();
 
+		}
+
+		public CommunicationUser getOriginalSender() {
+			return originalSender;
 		}
 
 		public Parcel getParcel() {
@@ -380,30 +499,62 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			return tiebreaker;
 		}
 
+		public Point getPosition() {
+			return position;
+		}
+
+		public BidMessage copy(CommunicationUser newSender) {
+			return new BidMessage(newSender, originalSender, parcel, bid, ttl,
+					tiebreaker, position);
+		}
+
 	}
 
 	private class BidStore {
-		private final Map<Parcel, BidMessage> bids = new HashMap<Parcel, SmartVehicle.BidMessage>();
-		private final LinkedList<BidMessage> queue = new LinkedList<SmartVehicle.BidMessage>();
+		private final Map<Parcel, BidMessage> bids = new HashMap<Parcel, BidMessage>();
+		private final LinkedList<BidMessage> queue = new LinkedList<BidMessage>();
+		private final PriorityQueue<BidMessage> pqueue =
+
+		new PriorityQueue<BidMessage>(nrConsideredFutures,
+				new Comparator<BidMessage>() {
+
+					@Override
+					public int compare(BidMessage o1, BidMessage o2) {
+						// Reverse ordering
+						if (o1.getBid() > o2.getBid())
+							return -1;
+						else if (o1.getBid() < o2.getBid())
+							return 1;
+						else
+							return 0;
+					}
+				});
 
 		public void ensconce(BidMessage bidMessage) {
 			Parcel parcel = bidMessage.getParcel();
 			if (bids.containsKey(parcel)) {
 				final BidMessage oldBid = bids.get(parcel);
 				if (bidMessage.getBid() > oldBid.getBid()) {
-					queue.remove(oldBid);
+					purge(oldBid);
 					queue.offer(bidMessage);
+					pqueue.offer(bidMessage);
 					bids.put(parcel, bidMessage);
 				} else if (bidMessage.getBid() == oldBid.getBid()
 						&& bidMessage.getTiebreaker() > oldBid.getTiebreaker()) {
 					queue.set(queue.indexOf(oldBid), bidMessage);
+					pqueue.remove(oldBid);
+					pqueue.offer(bidMessage);
 					bids.put(parcel, bidMessage);
-				} else if (bidMessage.getSender() == oldBid.getSender()) {
+				} else if (bidMessage.getOriginalSender() == oldBid
+						.getOriginalSender()) {
 					queue.set(queue.indexOf(oldBid), bidMessage);
+					pqueue.remove(oldBid);
+					pqueue.offer(bidMessage);
 					bids.put(parcel, bidMessage);
 				}
 			} else {
 				queue.offer(bidMessage);
+				pqueue.offer(bidMessage);
 				bids.put(parcel, bidMessage);
 			}
 		}
@@ -412,24 +563,39 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			return bids.keySet();
 		}
 
-		public Set<BidMessage> senderMessages(CommunicationUser sender) {
+		public Collection<BidMessage> getBids() {
+			return bids.values();
+		}
+
+		public Set<BidMessage> senderMessages(CommunicationUser originalSender) {
 			Set<BidMessage> sendersBids = new HashSet<SmartVehicle.BidMessage>();
 			for (BidMessage bid : bids.values()) {
-				if (bid.getSender() == sender) {
+				if (bid.getOriginalSender() == originalSender) {
 					sendersBids.add(bid);
 				}
 			}
 			return sendersBids;
 		}
 
-		public Set<Parcel> senderParcels(CommunicationUser sender) {
+		public Set<Parcel> senderParcels(CommunicationUser originalSender) {
 			Set<Parcel> sendersBids = new HashSet<Parcel>();
 			for (BidMessage bid : bids.values()) {
-				if (bid.getSender() == sender) {
+				if (bid.getOriginalSender() == originalSender) {
 					sendersBids.add(bid.getParcel());
 				}
 			}
 			return sendersBids;
+		}
+
+		public LinkedList<BidMessage> futures(CommunicationUser sender,
+				int nrFutures) {
+			LinkedList<BidMessage> futures = new LinkedList<BidMessage>();
+			for (int i = 0; i < Math.min(nrFutures, pqueue.size()); i++) {
+				futures.add(pqueue.poll());
+			}
+			pqueue.addAll(futures);
+
+			return futures;
 		}
 
 		public BidMessage yoink() {
@@ -437,21 +603,19 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			if (bid == null)
 				return null;
 			bid.decrementTtl();
-			if (bid.getTtl() > 0)
+			if (bid.getTtl() >= 0)
 				queue.offer(bid);
-			else
-				bids.remove(bid.getParcel());
-			try {
-				return bid.clone();
-			} catch (CloneNotSupportedException e) {
-				e.printStackTrace();
+			else {
+				purge(bid);
+				return yoink();
 			}
-			return bid;
+			return bid.copy(SmartVehicle.this);
 		}
 
 		public void purge(BidMessage target) {
 			bids.remove(target.getParcel());
 			queue.remove(target);
+			pqueue.remove(target);
 		}
 	}
 }
