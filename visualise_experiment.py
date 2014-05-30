@@ -23,29 +23,40 @@ for arg in sys.argv[1:]:
             experiment[configuration][resource] = statistics
 
 
-    opacity = 0.5
+    opacity = 0.6
+    lighten = 0.3
     
     nr_configurations = len(experiment.keys())
-    nr_resources = len(experiment.itervalues().next().keys())
+    nr_scenarios = 3
+    nr_resources = len(experiment.itervalues().next().keys()) / nr_scenarios
 
     spectral = cm.ScalarMappable(norm=colors.Normalize(vmin=-1,
                                                 vmax=nr_configurations),
                                     cmap='spectral')
 
-    resource_index = np.arange(nr_resources) 
+    resource_index = np.arange(nr_scenarios * nr_resources)
+    scenario_index = np.arange(nr_scenarios) 
     bar_width = 1.0/(nr_configurations + 1)
 
     for var in sorted(titles.iterkeys()):
         for index, config in enumerate(sorted(experiment.iterkeys())):
-            totalDistances = []
-            for resource in sorted(experiment[config].iterkeys()):
-                totalDistances.append(experiment[config][resource][var])
-            plt.bar(resource_index + index*bar_width,
-                    totalDistances,
-                    bar_width,
-                    alpha=opacity,
-                    color=spectral.to_rgba(index),
-                    label=config)
+            for res_i in xrange(0, nr_resources*nr_scenarios, 3):
+                statistics = []
+                for resource in sorted(
+                        experiment[config].iterkeys())[res_i:res_i+3]:
+                    statistics.append(experiment[config][resource][var])
+
+                if res_i == 0:
+                    label = config
+                else:
+                    label = '_nolegend_'
+
+                plt.bar(scenario_index + res_i + index*bar_width,
+                        statistics,
+                        bar_width,
+                        alpha=opacity - res_i%2 * lighten,
+                        color=spectral.to_rgba(index),
+                        label=label)
         
         plt.xlabel('Gendreau scenario')
         plt.ylabel(var)

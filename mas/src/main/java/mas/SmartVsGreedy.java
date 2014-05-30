@@ -52,7 +52,7 @@ public class SmartVsGreedy {
 	 *            This is ignored.
 	 */
 	public static void main(String[] args) {
-		new SmartVsGreedy().run(false);
+		new SmartVsGreedy().run(true);
 	}
 
 	public void run(final boolean testing) {
@@ -116,7 +116,7 @@ public class SmartVsGreedy {
 					configuration.toString());
 			for (SimulationResult result : Experiment.build(objFunc)
 					.withRandomSeed(123).addConfiguration(configuration)
-					.addScenario(scenario).showGui(uic).repeat(3).perform().results) {
+					.addScenario(scenario)/*.showGui(uic)*/.repeat(3).perform().results) {
 
 				expStats.addStats(result.stats);
 			}
