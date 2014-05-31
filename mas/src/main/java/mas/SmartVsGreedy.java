@@ -112,8 +112,7 @@ public class SmartVsGreedy {
 					.parse().get(0);
 
 			Configuration configuration = new Configuration(true);
-			ExperimentStats expStats = new ExperimentStats(resource,
-					configuration.toString());
+			ExperimentStats expStats = new ExperimentStats();
 			for (SimulationResult result : Experiment.build(objFunc)
 					.withRandomSeed(123).addConfiguration(configuration)
 					.addScenario(scenario)/*.showGui(uic)*/.repeat(3).perform().results) {
@@ -141,7 +140,7 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile("../smartvehicle_cost10_plan.json", json);
+		writeTextFile("../smartvehicle_cost10_simpleplan_correctorder.json", json);
 	}
 
 	public void writeTextFile(String fileName, String s) {
@@ -166,13 +165,7 @@ public class SmartVsGreedy {
 	}
 
 	private class ExperimentStats {
-		String resource;
-		String configuration;
 		Collection<StatisticsDTO> statistics = new LinkedList<StatisticsDTO>();
-
-		public ExperimentStats(String resource, String configuration) {
-			this.resource = resource;
-		}
 
 		public void addStats(StatisticsDTO stats) {
 			statistics.add(stats);

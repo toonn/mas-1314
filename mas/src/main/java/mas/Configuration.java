@@ -1,6 +1,5 @@
 package mas;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.math3.random.MersenneTwister;
 
 import rinde.sim.core.Simulator;
