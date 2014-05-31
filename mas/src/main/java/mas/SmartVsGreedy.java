@@ -10,6 +10,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import mas.Configuration.ExperimentParameters;
+
 import org.eclipse.swt.graphics.RGB;
 
 import rinde.sim.core.Simulator;
@@ -103,24 +105,27 @@ public class SmartVsGreedy {
 
 		Map<String, Map<String, ExperimentStats>> experimentStats = new HashMap<String, Map<String, ExperimentStats>>();
 		for (String resource : gendreauResources) {
-			Map<String, ExperimentStats> configStats = new HashMap<String, SmartVsGreedy.ExperimentStats>();
-			final Gendreau06Scenario scenario = Gendreau06Parser
-					.parser()
-					.addFile(
-							SmartVsGreedy.class.getResourceAsStream("/"
-									+ resource), resource).allowDiversion()
-					.parse().get(0);
+			for (ExperimentParameters params : ExperimentParameters.values()) {
+				Configuration configuration = new Configuration(params);
+				Map<String, ExperimentStats> configStats = new HashMap<String, SmartVsGreedy.ExperimentStats>();
+				final Gendreau06Scenario scenario = Gendreau06Parser
+						.parser()
+						.addFile(
+								SmartVsGreedy.class.getResourceAsStream("/"
+										+ resource), resource).allowDiversion()
+						.parse().get(0);
 
-			Configuration configuration = new Configuration(true);
-			ExperimentStats expStats = new ExperimentStats();
-			for (SimulationResult result : Experiment.build(objFunc)
-					.withRandomSeed(123).addConfiguration(configuration)
-					.addScenario(scenario)/*.showGui(uic)*/.repeat(3).perform().results) {
+				ExperimentStats expStats = new ExperimentStats();
+				for (SimulationResult result : Experiment.build(objFunc)
+						.withRandomSeed(123).addConfiguration(configuration)
+						.addScenario(scenario)/* .showGui(uic) */.repeat(3)
+						.perform().results) {
 
-				expStats.addStats(result.stats);
+					expStats.addStats(result.stats);
+				}
+				configStats.put(configuration.toString(), expStats);
+				experimentStats.put(resource, configStats);
 			}
-			configStats.put(configuration.toString(), expStats);
-			experimentStats.put(resource, configStats);
 		}
 
 		String json = "{ ";
@@ -140,7 +145,9 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile("../smartvehicle_cost10_simpleplan_correctorder.json", json);
+		writeTextFile(
+				"../allconfiguration.json",
+				json);
 	}
 
 	public void writeTextFile(String fileName, String s) {

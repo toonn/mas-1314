@@ -65,8 +65,8 @@ public class BestFutureSelection implements SelectStrategy {
 		// commBids.futures returns a list sorted from highest to lowest bid
 		BidMessage smallest = futureCandidates.peekLast();
 		for (Parcel p : pm.getContents(thisVehicle)) {
-			double pCost = thisVehicle.cost(pm, rm, thisVehicle.getPosition(),
-					pm.getContents(thisVehicle), p);
+			double pCost = thisVehicle.cost(pm, rm, time,
+					thisVehicle.getPosition(), pm.getContents(thisVehicle), p);
 			if (smallest == null || pCost > smallest.getBid()) {
 				futureCandidates.offer(thisVehicle.new BidMessage(thisVehicle,
 						p, pCost, thisVehicle.TTL, thisVehicle.getPosition()));
@@ -86,7 +86,7 @@ public class BestFutureSelection implements SelectStrategy {
 
 			double cumSum = 0;
 			for (BidMessage backer : backers) {
-				cumSum += thisVehicle.cost(pm, rm, futurePosition, cargo,
+				cumSum += thisVehicle.cost(pm, rm, time, futurePosition, cargo,
 						backer.getParcel());
 			}
 			if (cumSum > cumulativeFutureCost) {
@@ -101,7 +101,7 @@ public class BestFutureSelection implements SelectStrategy {
 				if (bid.getParcel().equals(curr.get())) {
 					currentFutureValue = 0;
 					for (BidMessage backer : backers) {
-						currentFutureValue += thisVehicle.cost(pm, rm,
+						currentFutureValue += thisVehicle.cost(pm, rm, time,
 								bid.getPosition(), pm.getContents(thisVehicle),
 								backer.getParcel());
 					}

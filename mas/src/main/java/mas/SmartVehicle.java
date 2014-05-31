@@ -128,13 +128,13 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		parcelSet.removeAll(commBids.getParcels());
 		// Bid on all of them if appropriate
 		for (Parcel parcel : parcelSet) {
-			commBids.ensconce(new BidMessage(this, parcel, cost(pm, rm,
+			commBids.ensconce(new BidMessage(this, parcel, cost(pm, rm, time,
 					getPosition(), pm.getContents(this), parcel), TTL));
 		}
-		for (BidMessage bid : commBids.getBids()) {
+		for (BidMessage bid : new ArrayList<BidMessage>(commBids.getBids())) {
 			commBids.ensconce(new BidMessage(this, bid.getParcel(), cost(pm,
-					rm, getPosition(), pm.getContents(this), bid.getParcel()),
-					TTL, bid.getPosition()));
+					rm, time, getPosition(), pm.getContents(this),
+					bid.getParcel()), TTL, bid.getPosition()));
 		}
 
 		sendBid();
@@ -235,9 +235,10 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		commBids.purge(vanished);
 	}
 
-	public double cost(PDPModel pm, RoadModel rm, Point position,
-			Collection<Parcel> cargo, Parcel parcel) {
-		return value.assign(pm, rm, position, cargo, parcel);
+	public double cost(PDPModel pm, RoadModel rm, TimeLapse time,
+			Point position, Collection<Parcel> cargo, Parcel parcel) {
+		return value.assign(this, pm, rm, time, commBids, position, cargo,
+				parcel);
 	}
 
 	private Collection<Parcel> getVisibleParcels(PDPModel pm, RoadModel rm) {
@@ -482,14 +483,18 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 							PDPModel pm = getPDPModel();
 							Point o1Location = o1.getPosition();
 							Point o2Location = o2.getPosition();
-							
-							if (pm.containerContains(SmartVehicle.this, o1.getParcel()))
+
+							if (pm.containerContains(SmartVehicle.this,
+									o1.getParcel()))
 								o1Location = o1.getParcel().getDestination();
-							if (pm.containerContains(SmartVehicle.this, o2.getParcel()))
+							if (pm.containerContains(SmartVehicle.this,
+									o2.getParcel()))
 								o2Location = o2.getParcel().getDestination();
-							
-							double o1Distance = Point.distance(getPosition(), o1Location);
-							double o2Distance = Point.distance(getPosition(), o2Location);
+
+							double o1Distance = Point.distance(getPosition(),
+									o1Location);
+							double o2Distance = Point.distance(getPosition(),
+									o2Location);
 
 							if (o1Distance < o2Distance)
 								return -1;
