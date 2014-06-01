@@ -23,7 +23,7 @@ for arg in sys.argv[1:]:
             experiment[configuration][resource] = statistics
 
 
-    opacity = 0.6
+    opacity = 0.7
     lighten = 0.3
     
     nr_configurations = len(experiment.keys())
@@ -39,11 +39,11 @@ for arg in sys.argv[1:]:
     bar_width = 1.0/(nr_configurations + 1)
 
     for var in sorted(titles.iterkeys()):
-        for index, config in enumerate(sorted(experiment.iterkeys())):
-            for res_i in xrange(0, nr_resources*nr_scenarios, 3):
+        for conf_i, config in enumerate(sorted(experiment.iterkeys())):
+            for res_i in xrange(0, nr_resources*nr_scenarios, 1):
                 statistics = []
-                for resource in sorted(
-                        experiment[config].iterkeys())[res_i:res_i+3]:
+                for resource in [sorted(
+                        experiment[config].iterkeys())[res_i]]:
                     statistics.append(experiment[config][resource][var])
 
                 if res_i == 0:
@@ -51,11 +51,11 @@ for arg in sys.argv[1:]:
                 else:
                     label = '_nolegend_'
 
-                plt.bar(scenario_index + res_i + index*bar_width,
+                plt.bar(res_i + conf_i*bar_width,
                         statistics,
                         bar_width,
                         alpha=opacity - res_i%2 * lighten,
-                        color=spectral.to_rgba(index),
+                        color=spectral.to_rgba(conf_i),
                         label=label)
         
         plt.xlabel('Gendreau scenario')
