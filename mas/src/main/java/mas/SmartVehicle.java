@@ -16,8 +16,6 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import org.apache.commons.math3.random.MersenneTwister;
-import org.apache.commons.math3.random.RandomGenerator;
-
 import rinde.sim.core.TimeLapse;
 import rinde.sim.core.graph.Point;
 import rinde.sim.core.model.communication.CommunicationAPI;
@@ -28,7 +26,6 @@ import rinde.sim.core.model.pdp.PDPModel;
 import rinde.sim.core.model.pdp.Parcel;
 import rinde.sim.core.model.road.RoadModel;
 import rinde.sim.core.model.road.RoadModels;
-import rinde.sim.pdptw.common.DefaultVehicle;
 import rinde.sim.pdptw.common.VehicleDTO;
 
 import com.google.common.base.Optional;
@@ -37,13 +34,11 @@ import com.google.common.base.Optional;
  * Implementation of a very simple taxi agent. It moves to the closest customer,
  * picks it up, then delivers it, repeat.
  */
-class SmartVehicle extends DefaultVehicle implements CommunicationUser {
+class SmartVehicle extends LocalVehicle implements CommunicationUser {
 
 	public static final String C_MALACHITE = "color.Malachite";
 	public static final String C_PERIWINKLE = "color.Periwinkle";
 	public static final String C_VERMILLION = "color.Vermillion";
-
-	private static final RandomGenerator rng = new MersenneTwister(123);
 
 	private CommunicationAPI cm;
 	private int commCounter = 0;
@@ -52,16 +47,9 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 	private final Set<Parcel> vanishedParcels = new HashSet<Parcel>();
 	private final LinkedList<Parcel> vanishedDiscoveries = new LinkedList<Parcel>();
 
-	private Point destination;
-	private long direction = 0;
-	private Optional<Parcel> curr = Optional.absent();
-
-	// BEGIN: parameters
-	private double commRadius = 0.5;
 	private double commReliability = 0.8;
 	public final int TTL;
 
-	private double randomMovementScalingFactor = 0.5 * commRadius;
 	private double roadUserInfluenceOnRandomWalk = 0.03;
 	private final SelectStrategy select;
 	private final ValueStrategy value;
@@ -219,7 +207,7 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 
 			while (!inBounds(rm, destination)) {
 				direction = rng.nextLong();
-				destination = movementVector(time);
+				destination = movementVector();
 			}
 
 			rm.moveTo(this, destination, time);
@@ -239,20 +227,6 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 			Point position, Collection<Parcel> cargo, Parcel parcel) {
 		return value.assign(this, pm, rm, time, commBids, position, cargo,
 				parcel);
-	}
-
-	private Collection<Parcel> getVisibleParcels(PDPModel pm, RoadModel rm) {
-		Collection<Parcel> visibleParcels = RoadModels.findObjectsWithinRadius(
-				getPosition(), rm, commRadius, Parcel.class);
-		Iterator<Parcel> it = visibleParcels.iterator();
-		while (it.hasNext()) {
-			Parcel p = it.next();
-			if (pm.getParcelState(p) != ANNOUNCED
-					&& pm.getParcelState(p) != AVAILABLE)
-				it.remove();
-		}
-
-		return visibleParcels;
 	}
 
 	private void sendBid() {
@@ -284,60 +258,9 @@ class SmartVehicle extends DefaultVehicle implements CommunicationUser {
 		}
 	}
 
-	private Point pointAdd(Point p1, Point p2) {
-		return Point.diff(p1, Point.divide(p2, -1));
-	}
-
-	private Point movementVector(TimeLapse time) {
-		Point destination = new Point(getPosition().x + Math.cos(direction)
-				* randomMovementScalingFactor, getPosition().y
-				+ Math.sin(direction) * randomMovementScalingFactor);
-		return destination;
-	}
-
-	/**
-	 * Assume the roadmodel is square.
-	 */
-	private boolean inBounds(RoadModel rm, Point point) {
-		double min = Double.POSITIVE_INFINITY;
-		double max = Double.NEGATIVE_INFINITY;
-		for (Point boundPoint : rm.getBounds()) {
-			if (boundPoint.x < min)
-				min = boundPoint.x;
-			if (boundPoint.x > max)
-				max = boundPoint.x;
-			if (boundPoint.y < min)
-				min = boundPoint.y;
-			if (boundPoint.y > max)
-				max = boundPoint.y;
-		}
-
-		if (point.x >= min && point.x <= max && point.y >= min
-				&& point.y <= max)
-			return true;
-		else
-			return false;
-	}
-
-	@Override
-	public void initRoadPDP(RoadModel pRoadModel, PDPModel pPdpModel) {
-		roadModel = Optional.of(pRoadModel);
-		pdpModel = Optional.of(pPdpModel);
-	}
-
 	@Override
 	public void setCommunicationAPI(CommunicationAPI api) {
 		cm = api;
-	}
-
-	@Override
-	public Point getPosition() {
-		return roadModel.get().getPosition(this);
-	}
-
-	@Override
-	public double getRadius() {
-		return commRadius;
 	}
 
 	@Override

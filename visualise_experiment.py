@@ -64,9 +64,11 @@ for arg in sys.argv[1:]:
         plt.xticks(resource_index + bar_width * nr_configurations / 2,
                 [res[11:] for res in
                     sorted(experiment.itervalues().next().keys())],
-                rotation = 45)
-        plt.legend()
+                rotation = 30, fontsize=7)
+        plt.subplots_adjust(top=.95, bottom=.22, left=.05, right=.99)
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+                ncol=4, prop={'size' : 6})
         
-        plt.tight_layout()
         plt.savefig('plots/' + arg[:-5] + '_' + var + '.png')
         plt.clf()
+

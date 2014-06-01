@@ -62,6 +62,8 @@ public class SmartVsGreedy {
 			@Override
 			public void createUI(Simulator sim) {
 				final UiSchema schema = new UiSchema(false);
+				schema.add(GreedyGlobalVehicle.class,
+						"/graphics/perspective/semi-truck-32.png");
 				schema.add(GreedyVehicle.class,
 						"/graphics/perspective/semi-truck-32.png");
 				schema.add(SmartVehicle.class,
@@ -107,7 +109,6 @@ public class SmartVsGreedy {
 		for (String resource : gendreauResources) {
 			for (ExperimentParameters params : ExperimentParameters.values()) {
 				Configuration configuration = new Configuration(params);
-				Map<String, ExperimentStats> configStats = new HashMap<String, SmartVsGreedy.ExperimentStats>();
 				final Gendreau06Scenario scenario = Gendreau06Parser
 						.parser()
 						.addFile(
@@ -123,8 +124,13 @@ public class SmartVsGreedy {
 
 					expStats.addStats(result.stats);
 				}
-				configStats.put(configuration.toString(), expStats);
-				experimentStats.put(resource, configStats);
+				if (experimentStats.get(resource) == null) {
+					Map<String, ExperimentStats> configStats = new HashMap<String, SmartVsGreedy.ExperimentStats>();
+					configStats.put(configuration.toString(), expStats);
+					experimentStats.put(resource, configStats);
+				} else
+					experimentStats.get(resource).put(configuration.toString(),
+							expStats);
 			}
 		}
 
@@ -145,9 +151,7 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile(
-				"../allconfiguration.json",
-				json);
+		writeTextFile("../allconfigurations.json", json);
 	}
 
 	public void writeTextFile(String fileName, String s) {

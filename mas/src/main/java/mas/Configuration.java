@@ -60,11 +60,20 @@ public class Configuration extends DefaultMASConfiguration {
 							params.roadUserInfluenceOnRandomWalk));
 				}
 			};
-		else
+		else if (ExperimentParameters.GREEDY.name().equals(params.name()))
 			creator = new Creator<AddVehicleEvent>() {
 				@Override
 				public boolean create(Simulator sim, AddVehicleEvent event) {
 					return sim.register(new GreedyVehicle(event.vehicleDTO));
+				}
+			};
+
+		else
+			creator = new Creator<AddVehicleEvent>() {
+				@Override
+				public boolean create(Simulator sim, AddVehicleEvent event) {
+					return sim.register(new GreedyGlobalVehicle(
+							event.vehicleDTO));
 				}
 			};
 		return creator;
@@ -76,6 +85,7 @@ public class Configuration extends DefaultMASConfiguration {
 	}
 
 	public enum ExperimentParameters {
+		GREEDY_GLOBAL(false, null, null, 0, 0, 0, 0, 0),
 		GREEDY(false, null, null, 0, 0, 0, 0, 0),
 		EARLY_TRIVIAL(true, new EarlySelection(), new TrivialValueStrategy(),
 				0.5, 0.8, 5, 0.5, 0.03),
@@ -133,7 +143,8 @@ public class Configuration extends DefaultMASConfiguration {
 
 		}
 
-		public String tostString() {
+		@Override
+		public String toString() {
 			return name().toLowerCase().replace("_", " ");
 		}
 	}
