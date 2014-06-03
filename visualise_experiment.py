@@ -10,7 +10,14 @@ titles = { 'totalDistance' : 'Comparison of total distance traveled',
             'pickupTardiness' : 'Comparison of amount of pickup tardiness',
             'deliveryTardiness' : 'Comparison of amount of delivery tardiness',
             'simulationTime' : 'Comparison of time needed to complete scenario',
-            'overTime' : 'Comparison of amount of cumulative overtime'}
+            'overTime' : 'Comparison of amount of cumulative overtime',
+            'gTardiness' :
+                'Tardiness in minutes according to Gendreau obj. function',
+            'gOverTime' :
+                'Overtime in minutes according to Gendreau obj. function',
+            'gTravelTime' :
+                'Traveltime in minutes according to Gendreau obj.function',
+            'gCost' : 'Computed value of the Gendreau obj. function'}
 
 for arg in sys.argv[1:]:
     f = open(arg,'r')

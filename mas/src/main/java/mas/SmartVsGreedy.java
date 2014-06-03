@@ -116,7 +116,7 @@ public class SmartVsGreedy {
 										+ resource), resource).allowDiversion()
 						.parse().get(0);
 
-				ExperimentStats expStats = new ExperimentStats();
+				ExperimentStats expStats = new ExperimentStats(objFunc);
 				for (SimulationResult result : Experiment.build(objFunc)
 						.withRandomSeed(123).addConfiguration(configuration)
 						.addScenario(scenario)/* .showGui(uic) */.repeat(3)
@@ -151,7 +151,7 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile("../allconfigurations.json", json);
+		writeTextFile("../Ggreedy.json", json);
 	}
 
 	public void writeTextFile(String fileName, String s) {
@@ -176,7 +176,12 @@ public class SmartVsGreedy {
 	}
 
 	private class ExperimentStats {
+		Gendreau06ObjectiveFunction gFunc;
 		Collection<StatisticsDTO> statistics = new LinkedList<StatisticsDTO>();
+
+		public ExperimentStats(Gendreau06ObjectiveFunction gFunc) {
+			this.gFunc = gFunc;
+		}
 
 		public void addStats(StatisticsDTO stats) {
 			statistics.add(stats);
@@ -230,6 +235,38 @@ public class SmartVsGreedy {
 			return totalOverTime / statistics.size();
 		}
 
+		public double getGTardiness() {
+			double gTardiness = 0;
+			for (StatisticsDTO stat : statistics) {
+				gTardiness += gFunc.tardiness(stat);
+			}
+			return gTardiness / statistics.size();
+		}
+
+		public double getGOverTime() {
+			double gOverTime = 0;
+			for (StatisticsDTO stat : statistics) {
+				gOverTime += gFunc.overTime(stat);
+			}
+			return gOverTime / statistics.size();
+		}
+
+		public double getGTravelTime() {
+			double gTravelTime = 0;
+			for (StatisticsDTO stat : statistics) {
+				gTravelTime += gFunc.travelTime(stat);
+			}
+			return gTravelTime / statistics.size();
+		}
+
+		public double getGCost() {
+			double gCost = 0;
+			for (StatisticsDTO stat : statistics) {
+				gCost += gFunc.computeCost(stat);
+			}
+			return gCost / statistics.size();
+		}
+
 		public String toString() {
 			String json = "{ \"totalDistance\" : " + getTotalDistance()
 					+ ", \"pickupTardiness\" : " + getPickupTardiness()
@@ -237,7 +274,11 @@ public class SmartVsGreedy {
 					+ ", \"simulationTime\" : " + getSimulationTime()
 					+ ", \"simFinish\" : "
 					+ Arrays.toString(getSimFinish().toArray())
-					+ ", \"overTime\" : " + getOverTime() + "}";
+					+ ", \"overTime\" : " + getOverTime()
+					+ ", \"gTardiness\" : " + getGTardiness()
+					+ ", \"gOverTime\" : " + getGOverTime()
+					+ ", \"gTravelTime\" : " + getGTravelTime()
+					+ ", \"gCost\" : " + getGCost() + "}";
 			return json;
 		}
 	}
