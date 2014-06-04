@@ -85,14 +85,14 @@ public class Configuration extends DefaultMASConfiguration {
 	}
 
 	public enum ExperimentParameters {
-//		GREEDY_GLOBAL(false, null, null, 0, 0, 0, 0, 0),
-		GREEDY(false, null, null, 0, 0, 0, 0, 0);//,
+		GREEDY_GLOBAL(false, null, null, 0, 0, 0, 0, 0),
+		GREEDY(false, null, null, 0, 0, 0, 0, 0),
 //		EARLY_TRIVIAL(true, new EarlySelection(), new TrivialValueStrategy(),
 //				0.5, 0.8, 5, 0.5, 0.03),
-//		EARLY_SIMPLE(true, new EarlySelection(), new SimpleValueStrategy(),
-//				0.5, 0.8, 5, 0.5, 0.03),
-//		BESTFUTURE_TRIVIAL(true, new BestFutureSelection(),
-//				new TrivialValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03),
+		EARLY_SIMPLE(true, new EarlySelection(), new SimpleValueStrategy(),
+				0.5, 0.8, 5, 0.5, 0.03),
+		BESTFUTURE_TRIVIAL(true, new BestFutureSelection(),
+				new TrivialValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03),
 //		BESTFUTURE_SIMPLE_LCommR_LRUI(true, new BestFutureSelection(),
 //				new SimpleValueStrategy(), 0.2, 0.8, 5, 0.5, 0.02),
 //		BESTFUTURE_SIMPLE_MCommR_LRUI(true, new BestFutureSelection(),
@@ -101,8 +101,8 @@ public class Configuration extends DefaultMASConfiguration {
 //				new SimpleValueStrategy(), 1, 0.8, 5, 0.5, 0.02),
 //		BESTFUTURE_SIMPLE_LCommR_MRUI(true, new BestFutureSelection(),
 //				new SimpleValueStrategy(), 0.2, 0.8, 5, 0.5, 0.03),
-//		BESTFUTURE_SIMPLE_Defaults(true, new BestFutureSelection(),
-//				new SimpleValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03),
+		BESTFUTURE_SIMPLE_Defaults(true, new BestFutureSelection(),
+				new SimpleValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03),
 //		BESTFUTURE_SIMPLE_HCommR_MRUI(true, new BestFutureSelection(),
 //				new SimpleValueStrategy(), 1, 0.8, 5, 0.5, 0.03),
 //		BESTFUTURE_SIMPLE_LCommR_HRUI(true, new BestFutureSelection(),
@@ -129,7 +129,8 @@ public class Configuration extends DefaultMASConfiguration {
 //		BESTFUTURE_SIMPLE_Lpunctuality(true, new BestFutureSelection(10, 42,
 //				1.1, -0.1), new SimpleValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03),
 //		BESTFUTURE_SIMPLE_Hpunctuality(true, new BestFutureSelection(10, 42,
-//				1.1, 0.2), new SimpleValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03);
+//				1.1, 0.2), new SimpleValueStrategy(), 0.5, 0.8, 5, 0.5, 0.03)
+				;
 
 		public boolean smart;
 		public SelectStrategy selectStrategy;

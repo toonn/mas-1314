@@ -54,7 +54,7 @@ public class SmartVsGreedy {
 	 *            This is ignored.
 	 */
 	public static void main(String[] args) {
-		new SmartVsGreedy().run(true);
+		new SmartVsGreedy().run(false);
 	}
 
 	public void run(final boolean testing) {
@@ -95,7 +95,7 @@ public class SmartVsGreedy {
 		final Gendreau06ObjectiveFunction objFunc = new Gendreau06ObjectiveFunction();
 
 		List<String> gendreauResources = new LinkedList<String>();
-		int[] nr = { 1, 2, 3, 4, 5 };
+		int[] nr = { 1, /*2, 3, 4, 5*/ };
 		int[] lod = { 240, 240, 450 };
 		int[] freq = { 24, 33, 24 };
 		for (int i : nr) {
@@ -112,14 +112,14 @@ public class SmartVsGreedy {
 				final Gendreau06Scenario scenario = Gendreau06Parser
 						.parser()
 						.addFile(
-								SmartVsGreedy.class.getResourceAsStream("/"
+								SmartVsGreedy.class.getResourceAsStream("/resources/"
 										+ resource), resource).allowDiversion()
 						.parse().get(0);
 
 				ExperimentStats expStats = new ExperimentStats(objFunc);
 				for (SimulationResult result : Experiment.build(objFunc)
 						.withRandomSeed(123).addConfiguration(configuration)
-						.addScenario(scenario)/* .showGui(uic) */.repeat(3)
+						.addScenario(scenario).showGui(uic).repeat(1)
 						.perform().results) {
 
 					expStats.addStats(result.stats);
@@ -151,7 +151,7 @@ public class SmartVsGreedy {
 		json += "\n}";
 
 		System.out.println(json);
-		writeTextFile("../Ggreedy.json", json);
+		writeTextFile("./experiment.json", json);
 	}
 
 	public void writeTextFile(String fileName, String s) {
