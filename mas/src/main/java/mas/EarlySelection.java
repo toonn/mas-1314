@@ -25,6 +25,9 @@ public class EarlySelection implements SelectStrategy {
 				commBids.purge(bid);
 			} else if (inCargo
 					&& bid.getParcel().getDeliveryTimeWindow().end < parcelEndTime) {
+				// Bug introduced when adding the 'vanishing' to the smart agent:
+				// This will never occur, parcels that are picked up are vanished,
+				// they will therefore not occur in commBids.
 				parcel = bid.getParcel();
 				parcelEndTime = parcel.getDeliveryTimeWindow().end;
 			} else if (!inCargo

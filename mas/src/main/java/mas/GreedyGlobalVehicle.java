@@ -18,12 +18,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 
-/**
- * Implementation of a very simple taxi agent. It moves to the closest customer,
- * picks it up, then delivers it, repeat.
- * 
- * @author Rinde van Lon <rinde.vanlon@cs.kuleuven.be>
- */
 class GreedyGlobalVehicle extends DefaultVehicle {
 	Optional<Parcel> curr = Optional.absent();
 

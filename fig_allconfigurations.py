@@ -19,7 +19,7 @@ titles = { 'totalDistance' : 'Comparison of total distance traveled',
                 'Traveltime in minutes according to Gendreau obj.function',
             'gCost' : 'Computed value of the Gendreau obj. function'}
 
-for arg in sys.argv[1:]:
+for arg in ['Gallconfigurations_correct.json']:
     f = open(arg,'r')
     experimentInput = json.loads(f.read())
     f.close()
@@ -45,7 +45,7 @@ for arg in sys.argv[1:]:
     scenario_index = np.arange(nr_scenarios) 
     bar_width = 1.0/(nr_configurations + 1)
 
-    for var in sorted(titles.iterkeys()):
+    for var in ['gCost']:
         for conf_i, config in enumerate(sorted(experiment.iterkeys())):
             for res_i in xrange(0, nr_resources*nr_scenarios, 1):
                 statistics = []
@@ -65,17 +65,16 @@ for arg in sys.argv[1:]:
                         color=spectral.to_rgba(conf_i),
                         label=label)
         
-        plt.xlabel('Gendreau scenario')
-        plt.ylabel(var)
+        plt.xlabel('Gendreau instance')
+        plt.ylabel('Total')
         plt.title(titles[var])
         plt.xticks(resource_index + bar_width * nr_configurations / 2,
                 [res[11:] for res in
                     sorted(experiment.itervalues().next().keys())],
                 rotation = 30, fontsize=7)
-        plt.subplots_adjust(top=.95, bottom=.22, left=.05, right=.99)
-        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1),
+        plt.subplots_adjust(top=.95, bottom=.25, left=.1, right=.99)
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
                 ncol=4, prop={'size' : 6})
         
-        plt.savefig('plots/' + arg[:-5] + '_' + var + '.png')
+        plt.savefig('plots/' + 'latex_Gallconfigurations_Total' + '.pdf')
         plt.clf()
-

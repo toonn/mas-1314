@@ -42,7 +42,6 @@ public class GreedyVehicle extends LocalVehicle {
 				}
 			}
 			double deliveryDistance = Double.POSITIVE_INFINITY;
-			long timewindowStart = Long.MAX_VALUE;
 			for (Parcel delivery : pm.getContents(this)) {
 				double distance = Point.distance(getPosition(),
 						delivery.getDestination());
@@ -51,12 +50,17 @@ public class GreedyVehicle extends LocalVehicle {
 						&& distance < deliveryDistance) {
 					parcel = delivery;
 					deliveryDistance = distance;
-					timewindowStart = Long.MIN_VALUE;
 					destination = delivery.getDestination();
-				} else if (delivery.getDeliveryTimeWindow().begin < timewindowStart) {
-					parcel = delivery;
-					destination = delivery.getDestination();
-					timewindowStart = delivery.getDeliveryTimeWindow().begin;
+				}
+			}
+			if (parcel == null) {
+				long timewindowStart = Long.MAX_VALUE;
+				for (Parcel delivery : pm.getContents(this)) {
+					if (delivery.getDeliveryTimeWindow().begin < timewindowStart) {
+						parcel = delivery;
+						destination = delivery.getDestination();
+						timewindowStart = delivery.getDeliveryTimeWindow().begin;
+					}
 				}
 			}
 
